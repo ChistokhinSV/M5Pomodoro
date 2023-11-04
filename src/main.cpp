@@ -109,6 +109,7 @@ void draw_battery(LGFX_Sprite *sprite = nullptr) {
 }
 
 void main_screen() {
+  beep();
   M5.Lcd.clear();
 
   M5.Lcd.setTextSize(1);
@@ -140,18 +141,13 @@ void setup() {
   FastLED.setBrightness(LED_BRIGHTNESS);
   FastLED.show();
 
-  back_buffer.setColorDepth(lgfx::rgb332_1Byte);
-  // back_buffer.setColorDepth(M5.Lcd.getColorDepth());
+  back_buffer.setColorDepth(M5.Lcd.getColorDepth());
+  back_buffer.setPsram(true);
   bool created = back_buffer.createSprite(
       M5.Lcd.width(),
       M5.Lcd.height());  // Create a sprite the size of the display
 
-  DEBUG_PRINTF("back_buffer created: %d w: %d, h: %d, c: %d\n", created,
-               back_buffer.width(), back_buffer.height(),
-               back_buffer.getColorDepth());
-
   M5.Speaker.setVolume(SPEAKER_VOLUME);
-  beep();
 
   M5.Lcd.setTextColor(GREEN);
   M5.Lcd.setRotation(1);
