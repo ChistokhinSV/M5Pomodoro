@@ -5,6 +5,8 @@ Copyright 2023 Sergei Chistokhin
 
 **/
 
+#include <secrets.h>
+
 #define DEBUG 1
 
 #if (DEBUG == 1)
