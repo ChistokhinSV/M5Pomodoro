@@ -51,10 +51,14 @@ int pomodoro_rest = POMODORO_REST;
 uint32_t pomodoro_time = 0;
 uint32_t pomodoro_time_end;
 
-#define SMALL_FONT 3
-#define BIG_FONT 8
-
 ESP32Time rtc;
+
+#define SMALL_FONT &fonts::Orbitron_Light_24
+#define SMALL_FONT_SIZE 2
+#define LARGE_FONT &fonts::Orbitron_Light_32
+#define LARGE_FONT_SIZE 1
+#define LARGE_FONT_SIZE_BIG 2
+#define CLOCK_FONT &fonts::Font7
 
 LGFX_Sprite back_buffer(&M5.Lcd);
 
@@ -75,13 +79,21 @@ void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
                        int color = 0x09F1, LGFX_Sprite *sprite = nullptr) {
   if (sprite == nullptr) {
     M5.Lcd.drawRect(x, y, w, h, color);
-    M5.Lcd.fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f), h - 1,
-                    color);
+    M5.Lcd.fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f),
+                        h - 1, color);
   } else {
     sprite->drawRect(x, y, w, h, color);
     sprite->fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f),
                      h - 1, color);
   }
+}
+
+void draw_task_name(String task_name, LGFX_Sprite *sprite) {
+      sprite->setTextSize(0);
+      sprite->setFont(SMALL_FONT);
+      int task_name_width = sprite->textWidth(task_name, SMALL_FONT);
+      int text_start = sprite->width() / 2 - task_name_width / 2;
+      sprite->drawString(task_name, text_start, 40, SMALL_FONT);
 }
 
 void draw_battery(LGFX_Sprite *sprite = nullptr) {
@@ -92,22 +104,16 @@ void draw_battery(LGFX_Sprite *sprite = nullptr) {
 void main_screen() {
   M5.Lcd.clear();
 
-  M5.Lcd.setRotation(1);
-  M5.Lcd.setCursor(60, 90);
-  M5.Lcd.setTextColor(GREEN);
+  M5.Lcd.setTextSize(1);
+  M5.Lcd.drawString("POMODORO", 58, 60, LARGE_FONT);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.drawString("TIMER", 50, 90, LARGE_FONT);
 
-  M5.Lcd.setTextSize(BIG_FONT);
-  M5.Lcd.print("TIMER");
-
-  M5.Lcd.setTextSize(SMALL_FONT);
-  M5.Lcd.setCursor(40, 220);
-  M5.Lcd.print("45");
-  M5.Lcd.setCursor(150, 220);
-  M5.Lcd.print("25");
-  M5.Lcd.setCursor(270, 220);
-  M5.Lcd.print("5");
-
-  M5.Lcd.setTextSize(BIG_FONT);
+  M5.Lcd.setTextSize(0);
+  M5.Lcd.setFont(SMALL_FONT);
+  M5.Lcd.drawString("45", 40, 215);
+  M5.Lcd.drawString("25", 145, 215);
+  M5.Lcd.drawString("5", 260, 215);
 
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();
@@ -126,17 +132,20 @@ void setup() {
   M5.begin();
 
   back_buffer.setColorDepth(lgfx::rgb332_1Byte);
+  // back_buffer.setColorDepth(M5.Lcd.getColorDepth());
   bool created = back_buffer.createSprite(
       M5.Lcd.width(),
       M5.Lcd.height());  // Create a sprite the size of the display
 
-  DEBUG_PRINTF("back_buffer created: %d w: %d, h: %d, c: %d\n", created, back_buffer.width(),
-               back_buffer.height(), back_buffer.getColorDepth());
+  DEBUG_PRINTF("back_buffer created: %d w: %d, h: %d, c: %d\n", created,
+               back_buffer.width(), back_buffer.height(),
+               back_buffer.getColorDepth());
 
   M5.Speaker.setVolume(SPEAKER_VOLUME);
   beep();
 
-  M5.Lcd.setTextSize(BIG_FONT);
+  M5.Lcd.setTextColor(GREEN);
+  M5.Lcd.setRotation(1);
 }
 
 void setCompletion(int width, CRGB color = CRGB::White) {
@@ -149,6 +158,7 @@ void setCompletion(int width, CRGB color = CRGB::White) {
   }
   FastLED.show();
 }
+
 
 void pomodoro_countdown() {
   M5.Lcd.setBrightness(200);
@@ -200,24 +210,23 @@ void pomodoro_countdown() {
       delay(1);
 
       back_buffer.setTextColor(GREEN);
-      back_buffer.setTextSize(BIG_FONT);
-      back_buffer.drawString(formattedTime, 60, 90);
-      draw_progress_bar(0, M5.Display.height() - PROGRESS_BAR_HEIGHT,
-                        M5.Display.width(), PROGRESS_BAR_HEIGHT, width, BLUE,
+      back_buffer.setTextSize(2);
+      back_buffer.drawString(formattedTime, 20, 100, CLOCK_FONT);
+
+      if (active_screen == STATE_COUNTDOWN_REST) {
+        draw_task_name("REST", &back_buffer);
+      } else {
+      draw_task_name("Pomodoro timer", &back_buffer);
+      }
+
+      draw_progress_bar(0, M5.Lcd.height() - PROGRESS_BAR_HEIGHT,
+                        M5.Lcd.width(), PROGRESS_BAR_HEIGHT, width, BLUE,
                         &back_buffer);
 
       draw_battery(&back_buffer);
 
-      if (active_screen == STATE_COUNTDOWN_REST) {
-        back_buffer.setTextSize(5);
-        back_buffer.setTextColor(GREEN);
-        back_buffer.setCursor(100, 45);
-        back_buffer.print("REST");
-        back_buffer.setTextSize(10);
-      }
-
-      M5.Display.waitDisplay();
-      back_buffer.pushSprite(&M5.Display, 0, 0);
+      M5.Lcd.waitDisplay();
+      back_buffer.pushSprite(&M5.Lcd, 0, 0);
 
       lastrender = timeleft;
     }
@@ -231,9 +240,12 @@ void pomodoro_countdown() {
 
   if (active_screen == STATE_COUNTDOWN) {
     M5.Lcd.clear();
-    M5.Lcd.setCursor(60, 90);
-    M5.Lcd.setTextColor(GREEN);
-    M5.Lcd.print("BREAK");
+
+    M5.Lcd.setTextSize(LARGE_FONT_SIZE_BIG);
+    M5.Lcd.setFont(LARGE_FONT);
+    const String break_text = "BREAK";
+    int break_size = M5.Lcd.textWidth(break_text, LARGE_FONT);
+    M5.Lcd.drawString(break_text, M5.Lcd.width()/2 - break_size / 2, 90, LARGE_FONT);
 
     M5.Power.setVibration(3);
     beep(false);
