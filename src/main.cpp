@@ -31,6 +31,8 @@ Copyright 2023 Sergei Chistokhin
 #define NUM_LEDS 10
 CRGB leds[NUM_LEDS];
 
+#define SCREEN_BRIGHTNESS 128
+
 #define STATE_UNDEFINED 0
 #define STATE_MAIN_SCREEN 1
 #define STATE_COUNTDOWN 2
@@ -50,6 +52,9 @@ int pomodoro_minutes = POMODORO_SMALL;
 int pomodoro_rest = POMODORO_REST;
 uint32_t pomodoro_time = 0;
 uint32_t pomodoro_time_end;
+
+#define WAKE_TIMEOUT 30
+uint32_t lastwake;
 
 ESP32Time rtc;
 
@@ -79,8 +84,8 @@ void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
                        int color = 0x09F1, LGFX_Sprite *sprite = nullptr) {
   if (sprite == nullptr) {
     M5.Lcd.drawRect(x, y, w, h, color);
-    M5.Lcd.fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f),
-                        h - 1, color);
+    M5.Lcd.fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f), h - 1,
+                    color);
   } else {
     sprite->drawRect(x, y, w, h, color);
     sprite->fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f),
@@ -89,11 +94,11 @@ void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
 }
 
 void draw_task_name(String task_name, LGFX_Sprite *sprite) {
-      sprite->setTextSize(0);
-      sprite->setFont(SMALL_FONT);
-      int task_name_width = sprite->textWidth(task_name, SMALL_FONT);
-      int text_start = sprite->width() / 2 - task_name_width / 2;
-      sprite->drawString(task_name, text_start, 40, SMALL_FONT);
+  sprite->setTextSize(0);
+  sprite->setFont(SMALL_FONT);
+  int task_name_width = sprite->textWidth(task_name, SMALL_FONT);
+  int text_start = sprite->width() / 2 - task_name_width / 2;
+  sprite->drawString(task_name, text_start, 40, SMALL_FONT);
 }
 
 void draw_battery(LGFX_Sprite *sprite = nullptr) {
@@ -119,17 +124,19 @@ void main_screen() {
   FastLED.show();
 
   draw_battery();
-  M5.Lcd.setBrightness(20);
+  M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
   M5.Power.setLed(0);
 }
 
 void setup() {
+  esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+  M5.begin();
+  DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
+
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.setBrightness(LED_BRIGHTNESS);
   FastLED.show();
-
-  M5.begin();
 
   back_buffer.setColorDepth(lgfx::rgb332_1Byte);
   // back_buffer.setColorDepth(M5.Lcd.getColorDepth());
@@ -146,6 +153,8 @@ void setup() {
 
   M5.Lcd.setTextColor(GREEN);
   M5.Lcd.setRotation(1);
+
+  lastwake = rtc.getEpoch();
 }
 
 void setCompletion(int width, CRGB color = CRGB::White) {
@@ -159,9 +168,8 @@ void setCompletion(int width, CRGB color = CRGB::White) {
   FastLED.show();
 }
 
-
 void pomodoro_countdown() {
-  M5.Lcd.setBrightness(200);
+  // M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
   M5.Power.setLed(1);
 
   beep();
@@ -216,7 +224,7 @@ void pomodoro_countdown() {
       if (active_screen == STATE_COUNTDOWN_REST) {
         draw_task_name("REST", &back_buffer);
       } else {
-      draw_task_name("Pomodoro timer", &back_buffer);
+        draw_task_name("Pomodoro timer", &back_buffer);
       }
 
       draw_progress_bar(0, M5.Lcd.height() - PROGRESS_BAR_HEIGHT,
@@ -245,7 +253,8 @@ void pomodoro_countdown() {
     M5.Lcd.setFont(LARGE_FONT);
     const String break_text = "BREAK";
     int break_size = M5.Lcd.textWidth(break_text, LARGE_FONT);
-    M5.Lcd.drawString(break_text, M5.Lcd.width()/2 - break_size / 2, 90, LARGE_FONT);
+    M5.Lcd.drawString(break_text, M5.Lcd.width() / 2 - break_size / 2, 90,
+                      LARGE_FONT);
 
     M5.Power.setVibration(3);
     beep(false);
@@ -292,4 +301,10 @@ void loop() {
       pomodoro_countdown();
     }
   }
+
+  if (rtc.getEpoch() - lastwake > WAKE_TIMEOUT) {
+    M5.Power.deepSleep();
+  }
+
+  delay(10);
 }
