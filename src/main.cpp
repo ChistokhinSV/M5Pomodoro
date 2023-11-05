@@ -5,6 +5,7 @@ Copyright 2023 Sergei Chistokhin
 
 **/
 
+#include <LittleFS.h>
 #include <secrets.h>
 
 #define DEBUG 1
@@ -67,6 +68,14 @@ ESP32Time rtc;
 #define LARGE_FONT_SIZE_BIG 2
 #define CLOCK_FONT &fonts::Font7
 
+// Structure to hold WAV file data
+struct WavFile {
+  uint8_t* data;
+  size_t size;
+};
+
+WavFile sound_ding;
+
 LGFX_Sprite back_buffer(&M5.Lcd);
 
 void beep(bool up = true, int count = 1) {
@@ -82,8 +91,42 @@ void beep(bool up = true, int count = 1) {
   }
 }
 
+void ding() { M5.Speaker.playWav(sound_ding.data, sound_ding.size); }
+
+// Function to load a WAV file into memory
+bool loadWavFile(const char* filename, WavFile* wavFile) {
+  if (wavFile == nullptr) {
+    return false;  // Pointer is null, cannot proceed
+  }
+
+  File file = LittleFS.open(filename, "r");
+  if (!file) {
+    Serial.printf("Failed to open % for reading", filename);
+    return false;
+  }
+
+  wavFile->size = file.size();
+  wavFile->data = new uint8_t[wavFile->size];
+  if (file.read(wavFile->data, wavFile->size) != wavFile->size) {
+    Serial.println("Failed to read file into memory");
+    delete[] wavFile->data;
+    return false;
+  }
+
+  file.close();
+  return true;
+}
+
+// Function to initialize the file system
+void initFileSystem() {
+  if (!LittleFS.begin(true)) {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+}
+
 void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
-                       int color = 0x09F1, LGFX_Sprite *sprite = nullptr) {
+                       int color = 0x09F1, LGFX_Sprite* sprite = nullptr) {
   if (sprite == nullptr) {
     M5.Lcd.drawRect(x, y, w, h, color);
     M5.Lcd.fillRect(x + 1, y + 1, w * (static_cast<float>(val) / 100.0f), h - 1,
@@ -95,7 +138,7 @@ void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
   }
 }
 
-void draw_task_name(String task_name, LGFX_Sprite *sprite) {
+void draw_task_name(String task_name, LGFX_Sprite* sprite) {
   sprite->setTextSize(0);
   sprite->setFont(SMALL_FONT);
   int task_name_width = sprite->textWidth(task_name, SMALL_FONT);
@@ -103,13 +146,13 @@ void draw_task_name(String task_name, LGFX_Sprite *sprite) {
   sprite->drawString(task_name, text_start, 40, SMALL_FONT);
 }
 
-void draw_battery(LGFX_Sprite *sprite = nullptr) {
+void draw_battery(LGFX_Sprite* sprite = nullptr) {
   int battery = M5.Power.getBatteryLevel();
   draw_progress_bar(280, 0, 40, 10, battery, RED, sprite);
 }
 
 void main_screen() {
-  beep();
+  ding();
   M5.Lcd.clear();
 
   M5.Lcd.setTextSize(1);
@@ -136,6 +179,14 @@ void setup() {
   M5.begin();
   DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
 
+  initFileSystem();
+
+  // Load WAV files
+  if (loadWavFile("/ding.wav", &sound_ding)) {
+    Serial.println("WAV file loaded into memory");
+  } else {
+    Serial.println("Failed to load WAV file");
+  }
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.setBrightness(LED_BRIGHTNESS);
@@ -170,7 +221,7 @@ void pomodoro_countdown() {
   // M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
   M5.Power.setLed(1);
 
-  beep();
+  ding();
 
   delay(250);   // debouncing
   M5.update();  // clear button state
@@ -254,13 +305,14 @@ void pomodoro_countdown() {
     M5.Lcd.drawString(break_text, M5.Lcd.width() / 2 - break_size / 2, 90,
                       LARGE_FONT);
 
-    M5.Power.setVibration(3);
-    beep(false);
-    delay(500);
+    M5.Power.setVibration(128);
+    ding();
+    delay(300);
     M5.Power.setVibration(0);
 
     active_screen = STATE_COUNTDOWN_REST;
     pomodoro_minutes = pomodoro_rest;
+    lastwake = rtc.getEpoch();
   } else {
     active_screen = STATE_MAIN_SCREEN;
     main_screen();
