@@ -6,6 +6,9 @@ Copyright 2023 Sergei Chistokhin
 **/
 
 #include <LittleFS.h>
+#include <esp_bt.h>
+#include <esp_bt_main.h>
+#include <esp_wifi.h>
 #include <secrets.h>
 
 #define DEBUG 1
@@ -56,6 +59,9 @@ int pomodoro_rest = POMODORO_REST;
 uint32_t pomodoro_time = 0;
 uint32_t pomodoro_time_end;
 
+#define TEXT_COLOR WHITE
+#define TIMER_COLOR GREEN
+
 #define WAKE_TIMEOUT 30
 uint32_t lastwake;
 
@@ -74,9 +80,16 @@ struct WavFile {
   size_t size;
 };
 
+#define BACKGROUND "/background1.png"
+
 WavFile sound_ding;
 
 LGFX_Sprite back_buffer(&M5.Lcd);
+
+int screen_size_x;
+int screen_center_x;
+int screen_size_y;
+int screen_center_y;
 
 void beep(bool up = true, int count = 1) {
   for (int i = 0; i < count; i++) {
@@ -138,33 +151,42 @@ void draw_progress_bar(int x, int y, int w, int h, uint8_t val,
   }
 }
 
-void draw_task_name(String task_name, LGFX_Sprite* sprite) {
+void draw_task_name(String task_name, LGFX_Sprite* sprite, int prev_font_height = 0) {
   sprite->setTextSize(0);
   sprite->setFont(SMALL_FONT);
-  int task_name_width = sprite->textWidth(task_name, SMALL_FONT);
-  int text_start = sprite->width() / 2 - task_name_width / 2;
-  sprite->drawString(task_name, text_start, 40, SMALL_FONT);
+  sprite->drawString(task_name, screen_center_x, screen_center_y - prev_font_height/2, SMALL_FONT);
 }
 
 void draw_battery(LGFX_Sprite* sprite = nullptr) {
   int battery = M5.Power.getBatteryLevel();
-  draw_progress_bar(280, 0, 40, 10, battery, RED, sprite);
+  int w = 40;
+  int h = 10;
+  int border = 2;
+  draw_progress_bar(screen_size_x - w - border, 0, w, h + border, battery, RED,
+                    sprite);
 }
 
 void main_screen() {
+  lastwake = rtc.getEpoch();
   ding();
+
   M5.Lcd.clear();
+  M5.Lcd.drawPngFile(LittleFS, BACKGROUND);
+
+  M5.Lcd.setFont(LARGE_FONT);
+  M5.Lcd.setTextSize(2);
+  int timer_text_height = M5.Lcd.fontHeight(LARGE_FONT);
+  M5.Lcd.drawString("TIMER", screen_center_x, screen_center_y, LARGE_FONT);
 
   M5.Lcd.setTextSize(1);
-  M5.Lcd.drawString("POMODORO", 58, 60, LARGE_FONT);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.drawString("TIMER", 50, 90, LARGE_FONT);
+  M5.Lcd.drawString("POMODORO", screen_center_x,
+                    screen_center_y - timer_text_height / 2, LARGE_FONT);
 
   M5.Lcd.setTextSize(0);
   M5.Lcd.setFont(SMALL_FONT);
-  M5.Lcd.drawString("45", 40, 215);
-  M5.Lcd.drawString("25", 145, 215);
-  M5.Lcd.drawString("5", 260, 215);
+  M5.Lcd.drawString("45", 55, 225);
+  M5.Lcd.drawString("25", 160, 225);
+  M5.Lcd.drawString("Rest", 270, 225);
 
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();
@@ -181,12 +203,20 @@ void setup() {
 
   initFileSystem();
 
+  screen_size_x = M5.Lcd.width();
+  screen_center_x = screen_size_x / 2;
+  screen_size_y = M5.Lcd.height();
+  screen_center_y = screen_size_y / 2;
+
   // Load WAV files
-  if (loadWavFile("/ding.wav", &sound_ding)) {
+  if (loadWavFile("/bell.wav", &sound_ding)) {
     Serial.println("WAV file loaded into memory");
   } else {
     Serial.println("Failed to load WAV file");
   }
+
+  M5.Lcd.setTextDatum(textdatum_t::middle_center);
+
   FastLED.addLeds<SK6812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.setBrightness(LED_BRIGHTNESS);
@@ -194,13 +224,12 @@ void setup() {
 
   back_buffer.setColorDepth(M5.Lcd.getColorDepth());
   back_buffer.setPsram(true);
-  bool created = back_buffer.createSprite(
-      M5.Lcd.width(),
-      M5.Lcd.height());  // Create a sprite the size of the display
+  bool created = back_buffer.createSprite(screen_size_x, screen_size_y);
+  back_buffer.setTextDatum(textdatum_t::middle_center);
 
   M5.Speaker.setVolume(SPEAKER_VOLUME);
 
-  M5.Lcd.setTextColor(GREEN);
+  M5.Lcd.setTextColor(TEXT_COLOR);
   M5.Lcd.setRotation(1);
 
   lastwake = rtc.getEpoch();
@@ -234,11 +263,11 @@ void pomodoro_countdown() {
   int minutes = 0;
   int seconds = 0;
 
-#define FORMATTED_TIME_SIZE 6
+  #define FORMATTED_TIME_SIZE 6
   char formattedTime[FORMATTED_TIME_SIZE];
   int lastrender = 0;
 
-  int width = 0;
+  int progress = 0;
 
   while (rtc.getEpoch() <= pomodoro_time_end) {
     pomodoro_time = rtc.getEpoch();
@@ -249,35 +278,37 @@ void pomodoro_countdown() {
     snprintf(formattedTime, FORMATTED_TIME_SIZE, "%02d:%02d", minutes, seconds);
 
     if (timeleft > 0) {
-      width = (1 - (timeleft / timer_length)) * 100;
+      progress = (1 - (timeleft / timer_length)) * 100;
     } else {
-      width = 100;
+      progress = 100;
     }
 
     if (lastrender != timeleft) {
       if (active_screen == STATE_COUNTDOWN_REST) {
-        setCompletion(width, CRGB::Green);
+        setCompletion(progress, CRGB::Green);
       } else {
-        setCompletion(width, CRGB::Red);
+        setCompletion(progress, CRGB::Red);
       }
 
       back_buffer.fillSprite(BLACK);
+      // back_buffer.drawPngFile(LittleFS, BACKGROUND);
       draw_battery(&back_buffer);
 
-      delay(1);
-
-      back_buffer.setTextColor(GREEN);
+      back_buffer.setTextColor(TIMER_COLOR);
       back_buffer.setTextSize(2);
-      back_buffer.drawString(formattedTime, 20, 100, CLOCK_FONT);
+      back_buffer.setFont(CLOCK_FONT);
+      back_buffer.drawString(formattedTime, screen_center_x, screen_size_y * 0.6, CLOCK_FONT);
+
+      int prev_font_height = back_buffer.fontHeight();
 
       if (active_screen == STATE_COUNTDOWN_REST) {
-        draw_task_name("REST", &back_buffer);
+        draw_task_name("REST", &back_buffer, prev_font_height);
       } else {
-        draw_task_name("Pomodoro timer", &back_buffer);
+        draw_task_name("Pomodoro timer", &back_buffer, prev_font_height);
       }
 
       draw_progress_bar(0, M5.Lcd.height() - PROGRESS_BAR_HEIGHT,
-                        M5.Lcd.width(), PROGRESS_BAR_HEIGHT, width, BLUE,
+                        M5.Lcd.width(), PROGRESS_BAR_HEIGHT, progress, BLUE,
                         &back_buffer);
 
       draw_battery(&back_buffer);
@@ -293,6 +324,7 @@ void pomodoro_countdown() {
       break;
     }
     M5.update();
+    delay(1);
   }
 
   if (active_screen == STATE_COUNTDOWN) {
@@ -307,13 +339,18 @@ void pomodoro_countdown() {
 
     M5.Power.setVibration(128);
     ding();
-    delay(300);
+    delay(500);
     M5.Power.setVibration(0);
 
     active_screen = STATE_COUNTDOWN_REST;
     pomodoro_minutes = pomodoro_rest;
     lastwake = rtc.getEpoch();
   } else {
+    M5.Power.setVibration(128);
+    ding();
+    delay(500);
+    M5.Power.setVibration(0);
+
     active_screen = STATE_MAIN_SCREEN;
     main_screen();
   }
@@ -329,30 +366,37 @@ void loop() {
     main_screen();
   }
 
-  if (M5.BtnA.wasPressed()) {
+  if (M5.BtnA.wasPressed()) {  // big tomato
     if (active_screen != STATE_COUNTDOWN) {
       active_screen = STATE_COUNTDOWN;
       pomodoro_minutes = POMODORO_BIG;
       pomodoro_rest = POMODORO_REST;
       pomodoro_countdown();
     }
-  } else if (M5.BtnB.wasPressed()) {
+  } else if (M5.BtnB.wasPressed()) {  // small tomato
     if (active_screen != STATE_COUNTDOWN) {
       active_screen = STATE_COUNTDOWN;
       pomodoro_minutes = POMODORO_SMALL;
       pomodoro_rest = POMODORO_REST_SMALL;
       pomodoro_countdown();
     }
-  } else if (M5.BtnC.wasPressed()) {
-    if (active_screen != STATE_COUNTDOWN) {
-      active_screen = STATE_COUNTDOWN;
-      pomodoro_minutes = POMODORO_MICRO;
-      pomodoro_rest = POMODORO_REST_SMALL;
+  } else if (M5.BtnC.wasPressed()) {  // Rest
+    if (active_screen != STATE_COUNTDOWN_REST) {
+      active_screen = STATE_COUNTDOWN_REST;
+      pomodoro_minutes = POMODORO_REST;
+      pomodoro_rest = POMODORO_REST;
       pomodoro_countdown();
     }
   }
 
   if (rtc.getEpoch() - lastwake > WAKE_TIMEOUT) {
+    esp_wifi_stop();
+    esp_bluedroid_disable();
+    esp_bluedroid_deinit();
+    esp_bt_controller_disable();
+    esp_bt_controller_deinit();
+    esp_bt_mem_release(ESP_BT_MODE_BTDM);
+
     M5.Power.deepSleep();
   }
 

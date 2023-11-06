@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "string": "cpp",
-        "*.tcc": "cpp"
-    }
+        "*.tcc": "cpp",
+        "cstdio": "cpp",
+        "fstream": "cpp",
+        "iostream": "cpp"
+    },
+    "idf.portWin": "COM5"
 }
