@@ -33,7 +33,7 @@ def get_project_name(workspace_id, project_id):
     toggl_api_url = 'https://api.track.toggl.com/api/v9'
     toggl_api_headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Basic {toggl_api_key}:api_token'
+        'Authorization': f'Basic {toggl_api_key}'
     }
 
     # Get the project name from Toggl
