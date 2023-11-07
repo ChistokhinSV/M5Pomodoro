@@ -33,13 +33,13 @@ def get_project_name(workspace_id, project_id):
     toggl_api_url = 'https://api.track.toggl.com/api/v9'
     toggl_api_headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Basic {toggl_api_key}:'
+        'Authorization': f'Basic {toggl_api_key}:api_token'
     }
 
     # Get the project name from Toggl
     try:
         response = requests.get(f'{toggl_api_url}/workspaces/{workspace_id}/projects/{project_id}', headers=toggl_api_headers)
-        logger.info(f'get_project_name response:{response}')
+        logger.info(f'get_project_name response:{response.status_code}, {response.text}')
         project_name = response.json().get('name', None)
         return project_name
     except Exception as e:
@@ -142,8 +142,9 @@ def create_calendar(event):
 def hmac_is_valid(message, signature, secret):
     logger.info(f'hmac_is_valid signature:{signature}')
     digest = hmac.new(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hexdigest()
-    logger.info(f'hmac_is_valid message digest:{digest}')
-    return hmac.compare_digest(signature, f'sha256={digest}')
+    hmac_valid = hmac.compare_digest(signature, f'sha256={digest}')
+    logger.info(f'hmac_is_valid:{hmac_valid}')
+    return hmac_valid
 
 def lambda_handler(event, context):
     logger.info(f'event: {event}')
