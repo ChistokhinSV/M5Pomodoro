@@ -13,7 +13,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 region_name = "ap-southeast-1"
-min_event_time = 60
+min_event_time = 300 # 5 minutes
 
 def get_project_name(workspace_id, project_id):
     logger.info(f'get_project_name\nworkspace_id: {workspace_id} project_id: {project_id}')
@@ -127,8 +127,8 @@ def create_calendar(event):
     toggl_event_id = payload.get('id', None)
     toggl_task_id = payload.get('task_id', None)
 
-    if workspace_id : event['extendedProperties']['private']['workspace_id'] = workspace_id
-    if project_id : event['extendedProperties']['private']['project_id'] = project_id
+    if workspace_id : event['extendedProperties']['private']['toggl_workspace_id'] = workspace_id
+    if project_id : event['extendedProperties']['private']['toggl_project_id'] = project_id
     if toggl_event_id : event['extendedProperties']['private']['toggl_event_id'] = toggl_event_id
     if toggl_task_id : event['extendedProperties']['private']['toggl_task_id'] = toggl_task_id
 
@@ -139,10 +139,8 @@ def create_calendar(event):
         event_result = service.events().insert(calendarId=google_calendar_id, body=event).execute()
     except Exception as e:
         logger.error(f'Error creating Google calendar event: {e}')
-        return {
-            'statusCode': 500,
-            'body': json.dumps('Error creating event')
-        }
+        return None
+    logger.info(f'Created Google calendar event: {event_result}')
     return event_result
 
 def hmac_is_valid(message, signature, secret):
@@ -214,8 +212,8 @@ def lambda_handler(event, context):
         if start and stop and duration and duration > min_event_time:
             # if both start and stop are present and duration > min_event_time sec, create an event in Google Calendar
             event_result = create_calendar(toggl_event)
-            status_code = event_result.get('statusCode', 500)
-            if status_code != 200:
+            status_code = event_result.get('statusCode', None)
+            if status_code and status_code != 200:
                 logger.error(f'Error creating event: {event_result}')
                 return event_result
             logger.info(f'Event created: {event_result}')
