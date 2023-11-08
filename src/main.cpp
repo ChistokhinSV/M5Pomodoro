@@ -10,6 +10,8 @@ Copyright 2023 Sergei Chistokhin
 #include <esp_bt_main.h>
 #include <esp_wifi.h>
 #include <secrets.h>
+#include <WiFi.h>
+#include <mqtt_client.h>
 
 #define DEBUG 1
 
@@ -23,13 +25,12 @@ Copyright 2023 Sergei Chistokhin
 #define DEBUG_PRINTF(x, ...)
 #endif
 
-// #include <Arduino.h>
 #define FASTLED_INTERNAL
 #include <ESP32Time.h>
 #include <FastLED.h>
 #include <M5Unified.h>
 
-#define SPEAKER_VOLUME 128  // 0 - 255
+#define SPEAKER_VOLUME 128
 
 // SK6812 LED strip
 #define LED_DATA_PIN 25
@@ -214,6 +215,27 @@ void setup() {
   } else {
     Serial.println("Failed to load WAV file");
   }
+
+    // M5.Display.println("Connecting to WiFi");
+
+    WiFi.disconnect();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+
+    #if defined ( WIFI_SSID ) &&  defined ( WIFI_PASS )
+      WiFi.begin(WIFI_SSID, WIFI_PASS);
+    #else
+      WiFi.begin();
+    #endif
+
+    // Serial.print("Connecting WiFi");
+    // while (WiFi.status() != WL_CONNECTED) {
+    //   Serial.print(".");
+    //   delay(100);
+    // }
+    // Serial.println();
+    // DEBUG_PRINTLN("Connected to WiFi");
+    // DEBUG_PRINTLN("IP: " + WiFi.localIP().toString());
 
   M5.Lcd.setTextDatum(textdatum_t::middle_center);
 
