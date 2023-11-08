@@ -26,6 +26,10 @@ Parameters:
     Default: ""
 
 Resources:
+  TogglWebhookBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: toggl-webhook-bucket
   TogglWebhookFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -48,10 +52,26 @@ Resources:
           GOOGLE_CALENDAR_AUTH_SECRET_ARN: !Ref AuthARN
           TOGGL_SIGNATURE: !Ref TogglSIG
           TOGGL_API_TOKEN: !Ref TogglAPI
+          BUCKET_NAME: !Ref TogglWebhookBucket
       Policies:
         - AWSLambdaExecute
         - Version: '2012-10-17'
           Statement:
+            # Permissions for S3 bucket
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: arn:aws:s3:::toggl-webhook-bucket/*
+            # Permissions for CloudWatch Logs
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+            # Permissions for Secrets Manager
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
