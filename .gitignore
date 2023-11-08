@@ -4,3 +4,6 @@
 .vscode/launch.json
 .vscode/ipch
 src/secrets.h
+src/cert/certificate.pem.crt
+src/cert/private.pem.key
+src/cert/public.pem.key
