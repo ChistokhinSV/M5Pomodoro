@@ -36,10 +36,10 @@ def event_processing(event, context):
                     event_result = google_calendar( record_body, event_action)
                 elif start and stop and duration and duration < min_event_time:
                     # if less than min_event_time, delete the event in Google Calendar
-                    logger.info(f'Deleting event with duration < {min_event_time} seconds')
+                    logger.debug(f'Deleting event with duration < {min_event_time} seconds')
                     event_result = google_calendar(record_body, 'deleted')
                 elif start and stop == None: # if only start present - create default_event_time long entry
-                    logger.info(f'Creating default_event_time ({default_event_time} minutes) long event')
+                    logger.debug(f'Creating default_event_time ({default_event_time} minutes) long event')
                     stop_time_obj = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')\
                         + timedelta(minutes=default_event_time)
                     record_body['payload']['stop'] = stop_time_obj.strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -51,7 +51,7 @@ def event_processing(event, context):
                 if status_code and status_code != 200:
                     logger.error(f'Error creating event: {event_result}')
                     return event_result
-                logger.info(f'Event {event_action}: {event_result}')
+                logger.debug(f'Event {event_action}: {event_result}')
                 return
         else:
             logger.error(f'Invalid payload type! Payload type: {type(payload)}')

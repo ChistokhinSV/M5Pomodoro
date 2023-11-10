@@ -13,15 +13,15 @@ def hmac_is_valid(message, signature, secret):
     '''
     Checking if signature for Toggl message is valid
     '''
-    logger.info(f'hmac_is_valid signature:{signature}')
+    logger.debug(f'hmac_is_valid signature:{signature}')
     digest = hmac.new(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hexdigest()
     hmac_valid = hmac.compare_digest(signature, f'sha256={digest}')
-    logger.info(f'hmac_is_valid:{hmac_valid}')
+    logger.debug(f'hmac_is_valid:{hmac_valid}')
     return hmac_valid
 
 def webhook_handler(event, context):
-    logger.info(f'event: {event}')
-    logger.info(f'context: {context}')
+    logger.debug(f'event: {event}')
+    logger.debug(f'context: {context}')
 
     toggl_event = json.loads(event['body'])
     headers = event.get('headers', None)
@@ -55,10 +55,10 @@ def webhook_handler(event, context):
 
     payload = toggl_event.get('payload', None)
     if payload and type(payload) == str: payload = payload.lower()
-    logger.info(f'payload_type: {payload}')
+    logger.debug(f'event payload: {payload}')
 
     validation_code = toggl_event.get('validation_code', None)
-    logger.info(f'validation_code: {validation_code}')
+    logger.debug(f'validation_code: {validation_code}')
 
     if validation_code:
         simple_ok = {
@@ -76,7 +76,7 @@ def webhook_handler(event, context):
         logger.info('Ping!')
         return simple_ok
     else:
-        logger.info('Queueing event!')
+        logger.debug('Queueing event')
         event_data = json.dumps(toggl_event)
         # Send the event data to the SQS queue
         sqs_client = boto3.client('sqs')
@@ -85,7 +85,4 @@ def webhook_handler(event, context):
             MessageBody=event_data
         )
         logger.info(f'Message sent to SQS: {response}')
-        return {
-            'statusCode': 200,
-            'body': json.dumps('Event enqueued for processing')
-        }
+        return simple_ok
