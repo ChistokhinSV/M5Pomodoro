@@ -60,8 +60,8 @@ int pomodoro_rest = POMODORO_REST;
 uint32_t pomodoro_time = 0;
 uint32_t pomodoro_time_end;
 
-#define TEXT_COLOR WHITE
-#define TIMER_COLOR GREEN
+#define TEXT_COLOR TFT_WHITE
+#define TIMER_COLOR TFT_GREEN
 
 #define WAKE_TIMEOUT 30
 uint32_t lastwake;
@@ -85,7 +85,8 @@ struct WavFile {
 
 WavFile sound_ding;
 
-LGFX_Sprite back_buffer(&M5.Lcd);
+// LGFX_Sprite back_buffer(&M5.Lcd);
+M5Canvas back_buffer(&M5.Lcd);
 
 int screen_size_x;
 int screen_center_x;
@@ -171,37 +172,43 @@ void main_screen() {
   lastwake = rtc.getEpoch();
   ding();
 
-  M5.Lcd.clear();
-  M5.Lcd.drawPngFile(LittleFS, BACKGROUND);
+  back_buffer.fillSprite(TFT_BLACK);
 
-  M5.Lcd.setFont(LARGE_FONT);
-  M5.Lcd.setTextSize(2);
-  int timer_text_height = M5.Lcd.fontHeight(LARGE_FONT);
-  M5.Lcd.drawString("TIMER", screen_center_x, screen_center_y, LARGE_FONT);
+  back_buffer.drawPngFile(LittleFS, BACKGROUND);
 
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.drawString("POMODORO", screen_center_x,
+  back_buffer.setFont(LARGE_FONT);
+  back_buffer.setTextSize(2);
+
+  int timer_text_height = back_buffer.fontHeight(LARGE_FONT);
+  back_buffer.setTextColor(TEXT_COLOR);
+  back_buffer.drawString("TIMER", screen_center_x, screen_center_y, LARGE_FONT);
+
+  back_buffer.setTextSize(1);
+  back_buffer.drawString("POMODORO", screen_center_x,
                     screen_center_y - timer_text_height / 2, LARGE_FONT);
 
-  M5.Lcd.setTextSize(0);
-  M5.Lcd.setFont(SMALL_FONT);
-  M5.Lcd.drawString("45", 55, 225);
-  M5.Lcd.drawString("25", 160, 225);
-  M5.Lcd.drawString("Rest", 270, 225);
+  back_buffer.setTextSize(0);
+  back_buffer.setFont(SMALL_FONT);
+  back_buffer.drawString("45", 55, 225);
+  back_buffer.drawString("25", 160, 225);
+  back_buffer.drawString("Rest", 270, 225);
 
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();
 
-  draw_battery();
-  M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
+  draw_battery(&back_buffer);
+  // M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
   M5.Power.setLed(0);
+
+  M5.Lcd.waitDisplay();
+  back_buffer.pushSprite(&M5.Lcd, 0, 0);
 }
 
 void setup() {
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
   M5.begin();
   DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
-
+  M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
   initFileSystem();
 
   screen_size_x = M5.Lcd.width();
@@ -245,7 +252,9 @@ void setup() {
   FastLED.show();
 
   back_buffer.setColorDepth(M5.Lcd.getColorDepth());
+  // back_buffer.setColorDepth(24);
   back_buffer.setPsram(true);
+
   bool created = back_buffer.createSprite(screen_size_x, screen_size_y);
   back_buffer.setTextDatum(textdatum_t::middle_center);
 
@@ -356,8 +365,7 @@ void pomodoro_countdown() {
     M5.Lcd.setFont(LARGE_FONT);
     const String break_text = "BREAK";
     int break_size = M5.Lcd.textWidth(break_text, LARGE_FONT);
-    M5.Lcd.drawString(break_text, M5.Lcd.width() / 2 - break_size / 2, 90,
-                      LARGE_FONT);
+    M5.Lcd.drawString(break_text, screen_center_x, screen_size_y, LARGE_FONT);
 
     M5.Power.setVibration(128);
     ding();
