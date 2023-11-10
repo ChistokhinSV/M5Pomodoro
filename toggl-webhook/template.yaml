@@ -54,8 +54,7 @@ Resources:
       Runtime: python3.11
       Timeout: 30
       Policies:
-        # need to replace it with actual logging and S3 access policy
-        - AWSLambdaExecute
+        - AWSLambdaBasicExecutionRole
         - SQSPollerPolicy:
             QueueName: !Ref TogglWebhookQueue
         - Version: "2012-10-17"
@@ -65,12 +64,19 @@ Resources:
               Action:
                 - secretsmanager:GetSecretValue
               Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:TogglWebhook-*
+            # Permissions for S3 bucket
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub "arn:aws:s3:::${TogglWebhookBucket}/*"
       Events:
         TogglQueueEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt TogglWebhookQueue.Arn
-            BatchSize: 10 # Set your preferred batch size
+            BatchSize: 10
       Environment:
         Variables:
           MIN_EVENT_TIME: !Ref MinEventTime
@@ -103,7 +109,7 @@ Resources:
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt TogglWebhookQueue.QueueName
-        - AWSLambdaExecute
+        - AWSLambdaBasicExecutionRole
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

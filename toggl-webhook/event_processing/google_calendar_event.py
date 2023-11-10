@@ -91,6 +91,23 @@ def closest_google_color(google_client, color):
     logger.debug(f'closest_color_id: {closest_color_id}, color:{google_colors[closest_color_id]}')
     return closest_color_id
 
+def format_duration(duration:int) -> str:
+    '''
+    Returns 'hh:mm:ss' if it is more than 1 hour
+    and 'mm:ss' if it is less
+    '''
+    # Calculate hours, minutes, and seconds
+    hours = duration // 3600
+    minutes = (duration % 3600) // 60
+    seconds = duration % 60
+
+    # Format the duration based on its length
+    if hours > 0:
+        # Duration is 1 hour or more
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    else:
+        # Duration is less than 1 hour
+        return f"{minutes:02d}:{seconds:02d}"
 
 def google_calendar(event, event_action = 'created'):
     from toggl_api_utils import get_project_name_and_color
@@ -104,6 +121,12 @@ def google_calendar(event, event_action = 'created'):
     end_time = payload.get('stop', None)
     workspace_id = payload.get('workspace_id', None)
     project_id = payload.get('project_id', None)
+    duration = payload.get('duration', None)
+    if duration:
+        duration = int(duration)
+        duration_formatted = format_duration(duration)
+    else:
+        duration_formatted = 'Not specified'
 
     if workspace_id and project_id:
         project_name, project_color = get_project_name_and_color(workspace_id, project_id)
@@ -164,6 +187,7 @@ def google_calendar(event, event_action = 'created'):
         }
 
     event_description = payload.get('description', '')
+
     toggl_event_id = payload.get('id', None)
     toggl_task_id = payload.get('task_id', None)
 
@@ -187,8 +211,13 @@ def google_calendar(event, event_action = 'created'):
     else:
         color_id = None
 
-    # Create a calendar event
+    if duration: project_name = f'{project_name} {duration_formatted}'
     if len(event_description) > 0: project_name = f'{project_name} ({event_description})'
+
+    event_description = f'{event_description}\n\nDuration: {duration_formatted}'
+    tags = payload.get('tags', None)
+    if tags: event_description += f'\nTags: {", ".join(tags)}'
+
     event = {
         'summary': project_name,
         'start': {'dateTime': start_time},
