@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 bucket_name = os.environ['BUCKET_NAME']
+secret_region_name = os.environ['SECRET_REGION_NAME']
+if len(secret_region_name) == 0: secret_region_name = None
 
 color_refresh = 1 # re-download google colors if it is older than 1 hour
 google_colors_filename = 'google_colors.json'
@@ -91,8 +93,7 @@ def closest_google_color(google_client, color):
 
 
 def google_calendar(event, event_action = 'created'):
-    from .toggl_api_utils import get_project_name_and_color
-    from webhook_handler.app import region_name
+    from toggl_api_utils import get_project_name_and_color
 
     logger.info(f'google_calendar\naction: {event_action}, event body: {event}')
 
@@ -131,7 +132,10 @@ def google_calendar(event, event_action = 'created'):
 
     # Set up the Google Calendar API client
     try:
-        client = boto3.client(service_name='secretsmanager', region_name=region_name)
+        if secret_region_name:
+            client = boto3.client(service_name='secretsmanager', region_name=secret_region_name)
+        else:
+            client = boto3.client(service_name='secretsmanager')
     except Exception as e:
         logger.error(f'Error creating boto3 client: {e}')
         return {

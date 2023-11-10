@@ -5,13 +5,13 @@ Description: Toggl Integration Lambda Function
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 3
+    Timeout: 10
 
 Parameters:
   CalendarID:
     Type: String
     Description: An environment variable for the Google Calendar ID
-    Default: "TEMPLATE! put your calendar id here"
+    Default: "TEMPLATE! put your google calendar id here"
   AuthARN:
     Type: String
     Description: An environment variable for the AUTH arn
@@ -24,20 +24,70 @@ Parameters:
     Type: String
     Description: An environment variable for Toggl API Token
     Default: ""
+  SecretRegionName:
+    Type: String
+    Description: Region, where AWS Secrets is stored (if empty - current region)
+    Default: ""
+  MinEventTime:
+    Type: Number
+    Description: The minimum time (in seconds) for an event to be processed.
+    Default: "300" # default to 5 minutes if not specified
+  DefaultEventTime:
+    Type: Number
+    Description: Default event time (in minutes) if no 'stop' specified in there
+    Default: "25" # 25 minutes. If no end time specified - assume it is pomodoro
 
 Resources:
   TogglWebhookBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: toggl-webhook-bucket
+  TogglWebhookQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: toggl-webhook-queue
+  TogglEventProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: event_processing/
+      Handler: event.event_processing
+      Runtime: python3.11
+      Timeout: 30
+      Policies:
+        # need to replace it with actual logging and S3 access policy
+        - AWSLambdaExecute
+        - SQSPollerPolicy:
+            QueueName: !Ref TogglWebhookQueue
+        - Version: "2012-10-17"
+          Statement:
+            # Permissions for Secrets Manager
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:TogglWebhook-*
+      Events:
+        TogglQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt TogglWebhookQueue.Arn
+            BatchSize: 10 # Set your preferred batch size
+      Environment:
+        Variables:
+          MIN_EVENT_TIME: !Ref MinEventTime
+          DEFAULT_EVENT_TIME: !Ref DefaultEventTime
+          GOOGLE_CALENDAR_ID: !Ref CalendarID
+          GOOGLE_CALENDAR_AUTH_SECRET_ARN: !Ref AuthARN
+          TOGGL_API_TOKEN: !Ref TogglAPI
+          BUCKET_NAME: !Ref TogglWebhookBucket
+          QUEUE_NAME: !Ref TogglWebhookQueue
+          SECRET_REGION_NAME: !Ref SecretRegionName
   TogglWebhookFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: .
-      Handler: webhook_handler.app.lambda_handler
+      CodeUri: webhook_handler/
+      Handler: handler.webhook_handler
       Runtime: python3.11
-      MemorySize: 128
-      Timeout: 30
+      # MemorySize: 128
       Architectures:
         - x86_64
       Events:
@@ -48,46 +98,26 @@ Resources:
             Method: post
       Environment:
         Variables:
-          GOOGLE_CALENDAR_ID: !Ref CalendarID
-          GOOGLE_CALENDAR_AUTH_SECRET_ARN: !Ref AuthARN
           TOGGL_SIGNATURE: !Ref TogglSIG
-          TOGGL_API_TOKEN: !Ref TogglAPI
-          BUCKET_NAME: !Ref TogglWebhookBucket
+          QUEUE_NAME: !Ref TogglWebhookQueue
       Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt TogglWebhookQueue.QueueName
         - AWSLambdaExecute
-        - Version: '2012-10-17'
-          Statement:
-            # Permissions for S3 bucket
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:PutObject
-                - s3:DeleteObject
-              Resource: arn:aws:s3:::toggl-webhook-bucket/*
-            # Permissions for CloudWatch Logs
-            - Effect: Allow
-              Action:
-                - logs:CreateLogGroup
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-            # Permissions for Secrets Manager
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:TogglWebhook-*
-
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  TogglWebhookApi:
-    Description: "API Gateway endpoint URL for Prod stage for Toggl Webhook function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/webhook/"
   TogglWebhookFunction:
     Description: "Toggl Webhook Lambda Function ARN"
     Value: !GetAtt TogglWebhookFunction.Arn
   TogglWebhookFunctionIamRole:
     Description: "Implicit IAM Role created for Toggl Webhook function"
     Value: !GetAtt TogglWebhookFunctionRole.Arn
+  TogglWebhookApi:
+    Description: "API Gateway endpoint URL for Prod stage for Toggl Webhook function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/webhook/"
+  TogglWebhookQueueUrl:
+    Description: "URL of the Toggl webhook queue"
+    Value: !Ref TogglWebhookQueue
