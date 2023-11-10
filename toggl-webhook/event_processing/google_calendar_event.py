@@ -1,10 +1,11 @@
 import boto3
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import json
+
 import os
 from datetime import datetime, timedelta, timezone
-import math
+import json
+from math import sqrt
 
 import logging
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ bucket_name = os.environ['BUCKET_NAME']
 secret_region_name = os.environ['SECRET_REGION_NAME']
 if len(secret_region_name) == 0: secret_region_name = None
 
-color_refresh = 1 # re-download google colors if it is older than 1 hour
+color_refresh = 720 # re-download google colors if it is older than 30 days (720 hours)
 google_colors_filename = 'google_colors.json'
 
 def hex_to_rgb_tuple(hex_color):
@@ -72,7 +73,7 @@ def color_distance(color1, color2):
     # Calculate the distance between two RGB tuples
     (r1, g1, b1) = color1
     (r2, g2, b2) = color2
-    return math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
+    return sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
 
 def closest_google_color(google_client, color):
     google_colors = get_google_colors(google_client)
@@ -124,7 +125,10 @@ def google_calendar(event, event_action = 'created'):
     duration = payload.get('duration', None)
     if duration:
         duration = int(duration)
-        duration_formatted = format_duration(duration)
+        if duration >= 0:
+            duration_formatted = format_duration(duration)
+        else:
+            duration_formatted = '[ongiong]'
     else:
         duration_formatted = 'Not specified'
 

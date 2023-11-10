@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta
+from google_calendar_event import google_calendar
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,8 +30,12 @@ def event_processing(event, context):
             start = payload.get('start', None)
             stop = payload.get('stop', None)
             duration = payload.get('duration', None)
+            if duration and duration < 0: duration = None # if duration is negative, ignore it (ongoing)
+            tags = payload.get('tags', None)
+            if tags and 'pomodoro-break' in tags:
+                logger.debug(f'Ignoring pomodoro-break event')
+                return
             if start or stop: # if start or stop exist - this is a calendar event to create/update/delete
-                from google_calendar_event import google_calendar
                 event_result = None
                 if start and stop and duration and duration >= min_event_time:
                     # if both start and stop are present and duration > min_event_time sec,
