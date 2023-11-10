@@ -47,12 +47,12 @@ def get_google_colors(google_client, object_key = google_colors_filename):
 
         # If the cached data is older than 1 hour, update it
         if datetime.now(timezone.utc) - last_modified > timedelta(hours=color_refresh):
-            logger.info("Google Colors cache is outdated, needs refresh.")
+            logger.debug("Google Colors cache is outdated, needs refresh.")
             raise Exception("Google Colors cache is outdated, needs refresh.")
-        logger.info("Google Colors cache is OK")
+        logger.debug("Google Colors cache is OK")
 
     except Exception as e:
-        logger.info(f'get_google_colors: {e}')
+        logger.debug(f'get_google_colors: {e}')
         # If the object does not exist or we decide to refresh it, fetch new data
         google_colors = fetch_google_colors(google_client)
         cache_google_colors(s3, google_colors)
@@ -76,11 +76,11 @@ def color_distance(color1, color2):
 
 def closest_google_color(google_client, color):
     google_colors = get_google_colors(google_client)
-    logger.info(f'google_colors: {google_colors}')
+    logger.debug(f'google_colors: {google_colors}')
 
     # Find the closest color in a list of colors
     color_to_find = hex_to_rgb(color)
-    logger.info(f'color_to_find: {color_to_find}')
+    logger.debug(f'color_to_find: {color_to_find}')
 
     smallest_distance = float('inf')
     for color_id, google_color_rgb in google_colors.items():
@@ -88,14 +88,14 @@ def closest_google_color(google_client, color):
         if distance < smallest_distance:
             smallest_distance = distance
             closest_color_id = color_id
-    logger.info(f'closest_color_id: {closest_color_id}, color:{google_colors[closest_color_id]}')
+    logger.debug(f'closest_color_id: {closest_color_id}, color:{google_colors[closest_color_id]}')
     return closest_color_id
 
 
 def google_calendar(event, event_action = 'created'):
     from toggl_api_utils import get_project_name_and_color
 
-    logger.info(f'google_calendar\naction: {event_action}, event body: {event}')
+    logger.info(f'google_calendar. action: {event_action}, event body: {event}')
 
     # Extract start and end times from the Toggl event
     payload = event.get('payload', None)
@@ -175,11 +175,11 @@ def google_calendar(event, event_action = 'created'):
         ).execute()
         events = events_result.get('items', [])
         if not events:
-            logger.info(f'No events found for toggl_event_id: {toggl_event_id}')
+            logger.debug(f'No events found for toggl_event_id: {toggl_event_id}')
         else:
             # Assuming the first returned event is the one you want to update
             existing_event_id = events[0]['id']
-            logger.info(f'events found for toggl_event_id: {toggl_event_id}. existing_event_id: {existing_event_id}')
+            logger.debug(f'events found for toggl_event_id: {toggl_event_id}. existing_event_id: {existing_event_id}')
 
     # find color for use with event
     if event_action != 'deleted':
@@ -205,7 +205,7 @@ def google_calendar(event, event_action = 'created'):
     if toggl_task_id : event['extendedProperties']['private']['toggl_task_id'] = toggl_task_id
     if color_id : event['colorId'] = color_id
 
-    logger.info(f'Event for Google Calendar: {event}')
+    logger.debug(f'Event for Google Calendar: {event}')
 
     # Call the Calendar API to create an event
     try:
@@ -218,5 +218,5 @@ def google_calendar(event, event_action = 'created'):
     except Exception as e:
         logger.error(f'Error processing Google calendar event: {e}')
         return None
-    logger.info(f'{event_action} Google calendar event: {event_result}')
+    logger.debug(f'{event_action} Google calendar event: {event_result}')
     return event_result

@@ -8,7 +8,7 @@ logger.setLevel(logging.INFO)
 toggl_api_url = 'https://api.track.toggl.com/api/v9'
 
 def get_project_name_and_color(workspace_id, project_id):
-    logger.info(f'get_project_name\nworkspace_id: {workspace_id} project_id: {project_id}')
+    logger.debug(f'get_project_name. workspace_id: {workspace_id} project_id: {project_id}')
 
     toggl_api_key = os.environ['TOGGL_API_TOKEN']
 
@@ -27,7 +27,7 @@ def get_project_name_and_color(workspace_id, project_id):
     # Get the project name from Toggl
     try:
         response = requests.get(f'{toggl_api_url}/workspaces/{workspace_id}/projects/{project_id}', headers=toggl_api_headers)
-        logger.info(f'get_project_name response:{response.status_code}, {response.text}')
+        logger.debug(f'get_project_name response:{response.status_code}, {response.text}')
         project_name = response.json().get('name', None)
         project_color = response.json().get('color', None)
         return project_name, project_color
