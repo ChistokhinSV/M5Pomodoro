@@ -31,8 +31,9 @@ def event_processing(event, context):
             duration = payload.get('duration', None)
             if start or stop: # if start or stop exist - this is a calendar event to create/update/delete
                 from google_calendar_event import google_calendar
-                if start and stop and duration and duration > min_event_time:
-                    # if both start and stop are present and duration > min_event_time sec, create an event in Google Calendar
+                if start and stop and duration and duration >= min_event_time:
+                    # if both start and stop are present and duration > min_event_time sec,
+                    # create an event in Google Calendar
                     event_result = google_calendar( record_body, event_action)
                 elif start and stop and duration and duration < min_event_time:
                     # if less than min_event_time, delete the event in Google Calendar
@@ -51,7 +52,8 @@ def event_processing(event, context):
                 if status_code and status_code != 200:
                     logger.error(f'Error creating event: {event_result}')
                     return event_result
-                logger.debug(f'Event {event_action}: {event_result}')
+                logger.error(f'Event without event_result: action: {event_action} \
+                    start:{start} stop:{stop} duration: {duration} record: {record_body}')
                 return
         else:
             logger.error(f'Invalid payload type! Payload type: {type(payload)}')
