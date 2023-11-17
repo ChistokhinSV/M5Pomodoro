@@ -4,9 +4,6 @@ M5Stack pomodoro timer
 Copyright 2023 Sergei Chistokhin
 
 **/
-#include <esp_bt.h>
-#include <esp_bt_main.h>
-#include <esp_wifi.h>
 #include <secrets.h>
 
 #define DEBUG 1
@@ -15,14 +12,12 @@ Copyright 2023 Sergei Chistokhin
 #include <MQTTClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <Ticker.h>
 
 #include "./debug.h"
 
 #define SPEAKER_VOLUME 128
 #define SCREEN_BRIGHTNESS 128
-
-#define WAKE_TIMEOUT 30  // seconds
-uint32_t lastwake;
 
 #include <ESP32Time.h>
 
@@ -32,24 +27,11 @@ int lastrender = 0;
 // screenRender active_screen;
 screenRender* active_screen;
 
-void goToSleep();
-Ticker sleepTicker(goToSleep, WAKE_TIMEOUT, 1);
-
 void updateControls();
-Ticker update_controls_ticker(updateControls, 100);
+Ticker main_ticker(updateControls, 100);
 
 void render_screen();
 Ticker render_screen_ticker(render_screen, 250);
-
-void goToSleep() {
-  esp_wifi_stop();
-  esp_bluedroid_disable();
-  esp_bluedroid_deinit();
-  esp_bt_controller_disable();
-  esp_bt_controller_deinit();
-  esp_bt_mem_release(ESP_BT_MODE_BTDM);
-  M5.Power.deepSleep();
-}
 
 void updateControls() {
   M5.update();
@@ -92,12 +74,12 @@ void setup() {
 
   active_screen = new screenRender();
 
-  update_controls_ticker.start();
+  main_ticker.start();
   render_screen_ticker.start();
 }
 
 void loop() {
-  update_controls_ticker.update();
+  main_ticker.update();
   render_screen_ticker.update();
   active_screen->update();
 }

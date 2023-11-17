@@ -10,17 +10,33 @@ Copyright 2023 Sergei Chistokhin
 #include <LittleFS.h>
 #include <M5Unified.h>
 
+#include <esp_bt.h>
+#include <esp_bt_main.h>
+#include <esp_wifi.h>
+
 #include <string>
 
 #include "./debug.h"
 #define FASTLED_INTERNAL
 #include <FastLED.h>
 
+#define WAKE_TIMEOUT 30  // seconds
+void goToSleep() {
+  esp_wifi_stop();
+  esp_bluedroid_disable();
+  esp_bluedroid_deinit();
+  esp_bt_controller_disable();
+  esp_bt_controller_deinit();
+  esp_bt_mem_release(ESP_BT_MODE_BTDM);
+  M5.Power.deepSleep();
+}
+Ticker sleepTicker(goToSleep, WAKE_TIMEOUT * 1000, MILLIS);
+
 screenRender::screenRender()
     : active_state(ScreenState::MainScreen),
       back_buffer(&M5.Lcd),
       lastrender(0) {
-  DEBUG_PRINTLN("screenRender::screenRender()");
+  sleepTicker.start();
 
   screen_height = M5.Lcd.height();
   screen_width = M5.Lcd.width();
@@ -66,8 +82,10 @@ void screenRender::setState(ScreenState state, bool rest,
   switch (state) {
     case ScreenState::MainScreen:
       pomodoro.stopTimer();
+      sleepTicker.start();
       break;
     case ScreenState::PomodoroScreen:
+      sleepTicker.stop();
       M5.update();  // clear button state
       pomodoro.setLength(pomodoro_minutes, pomodoro_rest_minutes);
       pomodoro.startTimer(true, rest);
@@ -153,6 +171,7 @@ void screenRender::pushBackBuffer() {
 }
 
 void screenRender::update() {
+  sleepTicker.update();
   pomodoro.update();
 
   auto pomo = pomodoro.getState();

@@ -4,8 +4,6 @@ M5Stack pomodoro timer
 Copyright 2023 Sergei Chistokhin
 
 **/
-#include "./debug.h"
-
 #include "PomodoroTimer.h"
 
 #include <ESP32Time.h>
@@ -15,6 +13,8 @@ Copyright 2023 Sergei Chistokhin
 #include <iomanip>
 #include <sstream>
 #include <string>
+
+#include "./debug.h"
 
 ESP32Time rtc;
 
@@ -28,8 +28,8 @@ PomodoroTimer::PomodoroTimer(
       pomodoroTimeEnd(0),
       pauseTime(0),
       pomodoroTicker([this] { this->loop(); }, 1000) {
-        DEBUG_PRINTLN("PomodoroTimer initalized")
-      }
+  DEBUG_PRINTLN("PomodoroTimer initalized")
+}
 
 void PomodoroTimer::startTimer(bool reset_timer, bool rest) {
   timerState = PomodoroState::POMODORO;
@@ -73,7 +73,9 @@ PomodoroTimer::PomodoroState PomodoroTimer::getState() { return timerState; }
 
 int PomodoroTimer::getTimerPercentage() {
   int timeleft = getRemainingTime();
-  return timeleft / (pomodoroMinutes * 60) * 100;
+  int timerLen = timerState == PomodoroState::REST ? restMinutes * 60
+                                                   : pomodoroMinutes * 60;
+  return 100 - ((timeleft * 100) / timerLen);
 }
 
 void PomodoroTimer::setLength(PomodoroLength pomodoroLength,
@@ -133,6 +135,4 @@ void PomodoroTimer::loop() {
   }
 }
 
-void PomodoroTimer::update() {
-  pomodoroTicker.update();
-}
+void PomodoroTimer::update() { pomodoroTicker.update(); }
