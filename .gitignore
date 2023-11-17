@@ -7,3 +7,6 @@ src/secrets.h
 src/cert/certificate.pem.crt
 src/cert/private.pem.key
 src/cert/public.pem.key
+cert/certificate.pem.crt
+cert/private.pem.key
+cert/public.pem.key
