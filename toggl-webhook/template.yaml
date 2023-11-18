@@ -6,6 +6,11 @@ Description: Toggl Integration Lambda Function
 Globals:
   Function:
     Timeout: 10
+    Environment:
+      Variables:
+        THING_NAME: !Ref ThingName
+        QUEUE_NAME: !Ref TogglWebhookQueue
+        TOGGL_API_TOKEN: !Ref TogglAPI
 
 Parameters:
   CalendarID:
@@ -36,6 +41,10 @@ Parameters:
     Type: Number
     Description: Default event time (in minutes) if no 'stop' specified in there
     Default: "25" # 25 minutes. If no end time specified - assume it is pomodoro
+  ThingName:
+    Type: String
+    Description: Thing to update
+    Default: ""
 
 Resources:
   TogglWebhookBucket:
@@ -49,8 +58,8 @@ Resources:
   TogglEventProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: event_processing/
-      Handler: event.event_processing
+      CodeUri: ./
+      Handler: event_processing.event.event_processing
       Runtime: python3.11
       Timeout: 30
       Policies:
@@ -71,6 +80,11 @@ Resources:
                 - s3:PutObject
                 - s3:DeleteObject
               Resource: !Sub "arn:aws:s3:::${TogglWebhookBucket}/*"
+            - Effect: Allow
+              Action:
+                - iot:UpdateThingShadow
+              Resource:
+                - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
       Events:
         TogglQueueEvent:
           Type: SQS
@@ -83,15 +97,13 @@ Resources:
           DEFAULT_EVENT_TIME: !Ref DefaultEventTime
           GOOGLE_CALENDAR_ID: !Ref CalendarID
           GOOGLE_CALENDAR_AUTH_SECRET_ARN: !Ref AuthARN
-          TOGGL_API_TOKEN: !Ref TogglAPI
           BUCKET_NAME: !Ref TogglWebhookBucket
-          QUEUE_NAME: !Ref TogglWebhookQueue
           SECRET_REGION_NAME: !Ref SecretRegionName
   TogglWebhookFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: webhook_handler/
-      Handler: handler.webhook_handler
+      CodeUri: ./
+      Handler: webhook_handler.handler.webhook_handler
       Runtime: python3.11
       # MemorySize: 128
       Architectures:
@@ -105,11 +117,17 @@ Resources:
       Environment:
         Variables:
           TOGGL_SIGNATURE: !Ref TogglSIG
-          QUEUE_NAME: !Ref TogglWebhookQueue
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt TogglWebhookQueue.QueueName
         - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17' # Policy version
+          Statement:
+            - Effect: Allow
+              Action:
+                - iot:UpdateThingShadow
+              Resource:
+                - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

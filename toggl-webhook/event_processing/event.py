@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta
-from google_calendar_event import google_calendar
+from event_processing.google_calendar_event import google_calendar
 
 import logging
 logger = logging.getLogger(__name__)

@@ -7,7 +7,10 @@ This project contains source code and supporting files for a serverless applicat
 
 The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
 
-Create Secret to store Google auth token
+1) Create Secret to store Google auth token
+2) Install SAM CLI https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
+3) Deploy SAM template:
+
 ```
 aws secretsmanager create-secret --name TogglWebhook --description "Google API secrets for Toggl integration" --secret-string file://path_to_your_downloaded_service_account_file.json
 ```
@@ -27,7 +30,7 @@ sam deploy --guided
 
 or with variables set:
 
-sam deploy --parameter-overrides CalendarID=XXX AuthARN=XXX TogglSIG=XXX TogglAPI=XXX --guided
+sam deploy --parameter-overrides CalendarID=XXXX AuthARN=XXXX TogglSIG=XXXX TogglAPI=XXXX ThingName=XXXX --guided
 ```
 
 

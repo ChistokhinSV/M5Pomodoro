@@ -85,4 +85,18 @@ def webhook_handler(event, context):
             MessageBody=event_data
         )
         logger.info(f'Message sent to SQS: {response}')
+
+        start = payload.get('start', None)
+        stop = payload.get('stop', None)
+        tags = payload.get('tags', [])
+        if not tags: tags = []
+
+        logger.info(f'start: {start}, stop: {stop}, tags: {tags}')
+
+        if (start or stop) and not 'pomodoro-break' in tags:
+            logger.debug(f'Updating timer')
+            from mqtt_utils import update_thing_timer
+            update_response = update_thing_timer()
+            logger.info(f'Timer updated: {update_response}')
+
         return simple_ok

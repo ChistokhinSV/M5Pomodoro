@@ -239,7 +239,6 @@ def google_calendar(event, event_action = 'created'):
     if color_id : event['colorId'] = color_id
 
     logger.debug(f'Event for Google Calendar: {event}')
-
     # Call the Calendar API to create an event
     try:
         if existing_event_id and event_action == 'deleted':
@@ -248,8 +247,10 @@ def google_calendar(event, event_action = 'created'):
             event_result = service.events().update(calendarId=google_calendar_id, eventId=existing_event_id, body=event).execute()
         else:
             event_result = service.events().insert(calendarId=google_calendar_id, body=event).execute()
+
     except Exception as e:
         logger.error(f'Error processing Google calendar event: {e}')
         return None
     logger.debug(f'{event_action} Google calendar event: {event_result}')
+
     return event_result
