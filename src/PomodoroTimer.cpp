@@ -15,8 +15,8 @@ Copyright 2023 Sergei Chistokhin
 #include <string>
 
 #include "./debug.h"
-
-ESP32Time rtc;
+#include "./main.h"
+// ESP32Time rtc;
 
 PomodoroTimer::PomodoroTimer(
     PomodoroLength pomodoroLength /* = PomodoroLength::SMALL */,

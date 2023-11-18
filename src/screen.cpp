@@ -19,9 +19,11 @@ Copyright 2023 Sergei Chistokhin
 #include "./debug.h"
 #define FASTLED_INTERNAL
 #include <FastLED.h>
+#include "./main.h"
 
 #define WAKE_TIMEOUT 30  // seconds
 void goToSleep() {
+  set_rtc();
   esp_wifi_stop();
   esp_bluedroid_disable();
   esp_bluedroid_deinit();

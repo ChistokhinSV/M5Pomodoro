@@ -52,7 +52,9 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "sntp.h": "c",
+        "sntp_opts.h": "c"
     },
     "idf.portWin": "COM5"
 }

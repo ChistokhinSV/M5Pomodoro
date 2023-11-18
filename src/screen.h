@@ -29,6 +29,8 @@ Copyright 2023 Sergei Chistokhin
 
 #define PROGRESS_BAR_HEIGHT 40
 
+extern Ticker sleepTicker;
+
 class screenRender {
  public:
   PomodoroTimer pomodoro;
