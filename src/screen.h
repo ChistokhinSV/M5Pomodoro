@@ -52,11 +52,14 @@ class screenRender {
                     PomodoroTimer::RestLength::REST_SMALL);
   ScreenState getState() { return active_state; }
   void update();
+  void setTaskName(String taskName) { description = taskName; }
+  String getTaskName() { return description; }
 
  private:
   ScreenState active_state;
   M5Canvas back_buffer;
   int lastrender;
+  String description;
 
   int screen_width;
   int screen_height;

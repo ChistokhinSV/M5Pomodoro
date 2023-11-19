@@ -65,8 +65,10 @@ void updateControls() {
 
   auto count = M5.Touch.getCount();
   if (count) {
-    sleepTicker.start();
-    DEBUG_PRINTLN("sleepTicker restarted");
+    if (sleepTicker.state() == RUNNING) {
+      sleepTicker.start();
+      DEBUG_PRINTLN("sleepTicker restarted");
+    }
   }
 
   switch (active_screen->getState()) {
@@ -115,6 +117,7 @@ void report_state(String timer_state, u_int32_t start_time,
   if (reported || both) {
     doc["state"]["reported"]["timer_state"] = timer_state;
     doc["state"]["reported"]["start"] = start_time;
+    doc["state"]["reported"]["description"] = active_screen->getTaskName();
   }
 
   if (!reported || both) {
@@ -142,23 +145,35 @@ void messageHandler(const String &topic, const String &payload) {
                                     // pause and other states?
     auto current_time = rtc.getEpoch();
     auto timer_ongoing = current_time - start_time;
-    if (timer_ongoing < 25 * 60) {  // small pomodoro
-      active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                              false);
-      active_screen->pomodoro.adjustStart(start_time);
-      // report_state(timer_state, start_time);
-    } else if (timer_ongoing < 45 * 60) {  // big pomodoro
-      active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                              true, PomodoroTimer::PomodoroLength::BIG,
-                              PomodoroTimer::RestLength::REST);
-      active_screen->pomodoro.adjustStart(start_time);
-    } else {  // stop if more than 45 minutes
-      active_screen->setState(screenRender::ScreenState::MainScreen);
-      report_state("STOPPED", 0, true, true);
+    if (active_screen->pomodoro.getState() !=
+            PomodoroTimer::PomodoroState::POMODORO ||
+        active_screen->pomodoro.getStartTime() != start_time) {
+      if (timer_ongoing < 25 * 60) {  // small pomodoro
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                false, false);
+        active_screen->pomodoro.adjustStart(start_time);
+        // report_state(timer_state, start_time);
+      } else if (timer_ongoing < 45 * 60) {  // big pomodoro
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                false, true, PomodoroTimer::PomodoroLength::BIG,
+                                PomodoroTimer::RestLength::REST);
+        active_screen->pomodoro.adjustStart(start_time);
+      } else {  // stop if more than 45 minutes
+        active_screen->setState(screenRender::ScreenState::MainScreen);
+        report_state("STOPPED", 0, true, true);
+      }
     }
+    auto description = state["description"];
+    if (description) {
+    active_screen->setTaskName(description);
+    }
+
   } else if (timer_state == "STOPPED") {
-    active_screen->setState(screenRender::ScreenState::MainScreen);
-    report_state("STOPPED", 0, true, true);
+    if (active_screen->pomodoro.getState() !=
+        PomodoroTimer::PomodoroState::STOPPED) {
+      active_screen->setState(screenRender::ScreenState::MainScreen);
+      report_state("STOPPED", 0, true, false);
+    }
   }
 
   //  const char* message = doc["message"];
@@ -181,6 +196,7 @@ void connectAWS() {
   // DEBUG_PRINTLN("connectAWS()");
   if (!client.connected()) {
     subscribed = false;
+    lastrequest = 0;
     if (WiFi.status() != WL_CONNECTED) {
       DEBUG_PRINTLN("Connecting to Wi-Fi...");
     } else {
@@ -214,12 +230,11 @@ void connectAWS() {
     if (!subscribed) {
       DEBUG_PRINTLN("AWS IoT Connected!");
       client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
-      // client.subscribe(get_topic(THINGNAME, true, true));   // updates on
-      // UPDATE
+      client.subscribe(get_topic(THINGNAME, true, true));   // updates on UPDATE
       subscribed = true;
     }
-    int curtime = rtc.getEpoch();
-    if (curtime - lastrequest > 5) {
+
+    if (lastrequest == 0) {
       set_rtc();
       char jsonBuffer[512];
       StaticJsonDocument<200> doc;
@@ -231,7 +246,7 @@ void connectAWS() {
 
       client.publish(get_topic(THINGNAME, false, false),
                      jsonBuffer);  // ask for current state
-      lastrequest = curtime;
+      lastrequest = rtc.getEpoch();
 
       Serial.println(rtc.getTimeDate(true));
       // m5::rtc_date_t date = M5.Rtc.getDate();

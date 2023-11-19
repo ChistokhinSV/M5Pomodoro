@@ -37,6 +37,7 @@ Ticker sleepTicker(goToSleep, WAKE_TIMEOUT * 1000, MILLIS);
 screenRender::screenRender()
     : active_state(ScreenState::MainScreen),
       back_buffer(&M5.Lcd),
+      description(""),
       lastrender(0) {
   sleepTicker.start();
 
@@ -80,6 +81,7 @@ void screenRender::setState(ScreenState state, bool rest, bool report_desired,
     switch (state) {
       case ScreenState::MainScreen:
         pomodoro.stopTimer();
+        description = "";
         break;
       case ScreenState::PomodoroScreen:
         M5.update();  // clear button state
@@ -111,10 +113,12 @@ void screenRender::drawStatusIcons() {
 }
 
 void screenRender::drawTaskName(String task_name, int prev_font_height) {
-  back_buffer.setTextSize(0);
-  back_buffer.setFont(SMALL_FONT);
-  back_buffer.drawString(task_name, screen_center_x,
-                         screen_center_y - prev_font_height / 2 - 20);
+  if (task_name.length() > 0) {
+    back_buffer.setTextSize(0);
+    back_buffer.setFont(SMALL_FONT);
+    back_buffer.drawString(task_name, screen_center_x,
+                           screen_center_y - prev_font_height / 2 - 20);
+  }
 }
 
 void screenRender::setCompletion(int width, CRGB color) {
@@ -203,6 +207,8 @@ void screenRender::renderPomodoroScreen(bool pause /*= false*/) {
     case PomodoroTimer::PomodoroState::PAUSED:
       drawTaskName("PAUSED", back_buffer.fontHeight());
       break;
+    case PomodoroTimer::PomodoroState::POMODORO:
+      drawTaskName(description, back_buffer.fontHeight());
     default:
       break;
   }
