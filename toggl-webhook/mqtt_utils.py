@@ -8,6 +8,11 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 def get_remaining_time():
     """
     Prepares shadow data for timer
@@ -41,11 +46,19 @@ def get_remaining_time():
     # Convert 'start' time to epoch seconds
     start_epoch = int(start_time.timestamp())
 
+    project_id = response_json.get('project_id', None)
+    workspace_id = response_json.get('workspace_id', None)
+    from toggl_api_utils import get_project_name_and_color
+    description, color = get_project_name_and_color(workspace_id, project_id)
+    if not description:
+        description = ''
+
     # Prepare the payload to be sent
     payload = {
         "state": {
             "desired": {
                 "timer_state": "POMODORO",
+                "description" : description,
                 "start": start_epoch
             }
         }

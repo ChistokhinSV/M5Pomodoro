@@ -1,8 +1,16 @@
 import json
 import logging
 import os
+
+import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 
 def lambda_handler(event, context):
@@ -30,6 +38,8 @@ def lambda_handler(event, context):
             project_name, color = start_timer(TOGGL_WID)
             logger.info(f'start_timer {project_name}')
             description = project_name
+            if not description:
+                description = ''
         else:
             logger.info(f"The device timer is now {new_state} - do nothing")
 
@@ -45,6 +55,7 @@ def lambda_handler(event, context):
                 }
             }
         }
+        logger.info(f"Updating device shadow with description payload: {payload}")
         from mqtt_utils import update_device_shadow
         update_device_shadow(THING_NAME, payload)
 
