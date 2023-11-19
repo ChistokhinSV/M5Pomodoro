@@ -20,7 +20,8 @@ class PomodoroTimer {
   PomodoroTimer(PomodoroLength pomodoroLength = PomodoroLength::SMALL,
                 RestLength restLength = RestLength::REST_SMALL);
 
-  void startTimer(bool reset_timer = true, bool rest = false);
+  void startTimer(bool reset_timer = true, bool rest = false, bool report_desired = true);
+  void adjustStart(uint32_t startTime);
   void startRest();
   void stopTimer(bool pause = false);
   void pauseTimer();
@@ -32,6 +33,7 @@ class PomodoroTimer {
 
   PomodoroState getState();
   int getTimerPercentage();
+  uint32_t getStartTime();
 
   void setLength(PomodoroLength pomodoroLength, RestLength restLength);
   void setLength(PomodoroLength pomodoroLength);

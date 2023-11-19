@@ -31,21 +31,45 @@ PomodoroTimer::PomodoroTimer(
   DEBUG_PRINTLN("PomodoroTimer initalized")
 }
 
-void PomodoroTimer::startTimer(bool reset_timer, bool rest) {
+void PomodoroTimer::startTimer(bool reset_timer, bool rest,
+                               bool report_desired) {
   timerState = PomodoroState::POMODORO;
   pomodoroTimeStart = rtc.getEpoch();
+  String state;
   if (reset_timer) {
     if (rest) {
       pomodoroTimeEnd = pomodoroTimeStart + restMinutes * 60;
       timerState = PomodoroState::REST;
+      state = "REST";
     } else {
       pomodoroTimeEnd = pomodoroTimeStart + pomodoroMinutes * 60;
+      state = "POMODORO";
     }
     pauseTime = 0;
   } else {
     pomodoroTimeEnd = pomodoroTimeStart + pauseTime;
   }
   pomodoroTicker.start();
+  if (report_desired) {
+    report_state(state, pomodoroTimeStart, true, true);
+  } else {
+    report_state(state, pomodoroTimeStart);
+  }
+}
+
+void PomodoroTimer::adjustStart(uint32_t startTime) {
+  if (pomodoroTimeStart != startTime) {
+    pomodoroTimeStart = startTime;
+    String state;
+    if (timerState == PomodoroState::REST) {
+      pomodoroTimeEnd = pomodoroTimeStart + restMinutes * 60;
+      state = "REST";
+    } else {
+      pomodoroTimeEnd = pomodoroTimeStart + pomodoroMinutes * 60;
+      state = "POMODORO";
+    }
+    report_state(state, pomodoroTimeStart, true, true);
+  }
 }
 
 void PomodoroTimer::startRest() { startTimer(true, true); }
@@ -55,12 +79,14 @@ void PomodoroTimer::stopTimer(bool pause) {
   pomodoroTimeEnd = 0;
   if (pause) {
     pauseTime = rtc.getEpoch() - pomodoroTimeEnd;
-    pauseTime = pauseTime > 0 ? pauseTime : 0;
+    pause = pauseTime > 0;
+    pauseTime = pause ? pauseTime : 0;
   } else {
     pauseTime = 0;
   }
-  timerState = pauseTime > 0 ? PomodoroState::PAUSED : PomodoroState::STOPPED;
+  timerState = pause ? PomodoroState::PAUSED : PomodoroState::STOPPED;
   pomodoroTicker.stop();
+  report_state(pause ? "PAUSED" : "STOPPED", pomodoroTimeStart, true, true);
 }
 
 void PomodoroTimer::pauseTimer() { stopTimer(true); }
@@ -77,6 +103,8 @@ int PomodoroTimer::getTimerPercentage() {
                                                    : pomodoroMinutes * 60;
   return 100 - ((timeleft * 100) / timerLen);
 }
+
+uint32_t PomodoroTimer::getStartTime() { return pomodoroTimeStart; }
 
 void PomodoroTimer::setLength(PomodoroLength pomodoroLength,
                               RestLength restLength) {

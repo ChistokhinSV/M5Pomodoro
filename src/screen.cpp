@@ -9,7 +9,6 @@ Copyright 2023 Sergei Chistokhin
 
 #include <LittleFS.h>
 #include <M5Unified.h>
-
 #include <esp_bt.h>
 #include <esp_bt_main.h>
 #include <esp_wifi.h>
@@ -19,6 +18,7 @@ Copyright 2023 Sergei Chistokhin
 #include "./debug.h"
 #define FASTLED_INTERNAL
 #include <FastLED.h>
+
 #include "./main.h"
 
 #define WAKE_TIMEOUT 30  // seconds
@@ -78,29 +78,33 @@ void screenRender::render() {
       break;
   }
 }
-void screenRender::setState(ScreenState state, bool rest,
+
+void screenRender::setState(ScreenState state, bool rest, bool report_desired,
                             PomodoroTimer::PomodoroLength pomodoro_minutes,
                             PomodoroTimer::RestLength pomodoro_rest_minutes) {
-  switch (state) {
-    case ScreenState::MainScreen:
-      pomodoro.stopTimer();
-      sleepTicker.start();
-      break;
-    case ScreenState::PomodoroScreen:
-      sleepTicker.stop();
-      M5.update();  // clear button state
-      pomodoro.setLength(pomodoro_minutes, pomodoro_rest_minutes);
-      pomodoro.startTimer(true, rest);
-      break;
-    default:
-      break;
-  }
-  active_state = state;
+  if (active_state != state) {
+    switch (state) {
+      case ScreenState::MainScreen:
+        pomodoro.stopTimer();
+        sleepTicker.start();
+        break;
+      case ScreenState::PomodoroScreen:
+        sleepTicker.stop();
+        M5.update();  // clear button state
+        pomodoro.setLength(pomodoro_minutes, pomodoro_rest_minutes);
+        pomodoro.startTimer(true, rest, report_desired);
+        break;
+      default:
+        break;
+    }
 
-  M5.Power.setVibration(128);
-  ding();
-  delay(500);
-  M5.Power.setVibration(0);
+    M5.Power.setVibration(128);
+    ding();
+    delay(500);
+    M5.Power.setVibration(0);
+
+    active_state = state;
+  }
 }
 
 void screenRender::drawProgressBar(int x, int y, int w, int h, int val,

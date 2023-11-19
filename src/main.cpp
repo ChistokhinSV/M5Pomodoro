@@ -34,7 +34,8 @@ MQTTClient client = MQTTClient(8192);  // up to 8kb shadow
 
 #include "./main.h"
 
-const int tz_shift = 7;  // GMT+7
+// const int tz_shift = 7;  // GMT+7
+const int tz_shift = 0;  // local clock to UTC
 
 const char *ntpServer = "pool.ntp.org";
 const int gmtOffset_sec = tz_shift * 3600;
@@ -70,15 +71,15 @@ void updateControls() {
 
   if (M5.BtnA.wasPressed()) {
     active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                            PomodoroTimer::PomodoroLength::BIG,
+                            true, PomodoroTimer::PomodoroLength::BIG,
                             PomodoroTimer::RestLength::REST);
   } else if (M5.BtnB.wasPressed()) {
     active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                            PomodoroTimer::PomodoroLength::SMALL,
+                            true, PomodoroTimer::PomodoroLength::SMALL,
                             PomodoroTimer::RestLength::REST_SMALL);
   } else if (M5.BtnC.wasPressed()) {
     active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
-                            PomodoroTimer::PomodoroLength::SMALL,
+                            true, PomodoroTimer::PomodoroLength::SMALL,
                             PomodoroTimer::RestLength::REST_SMALL);
   }
 }
@@ -93,6 +94,25 @@ String get_topic(String thingName, bool update = false, bool accepted = false) {
   return topic;
 }
 
+void report_state(String timer_state, u_int32_t start_time,
+                  bool reported /* = true */, bool both /* = false */) {
+  char jsonBuffer[512];
+  StaticJsonDocument<200> doc;
+
+  if (reported || both) {
+    doc["state"]["reported"]["timer_state"] = timer_state;
+    doc["state"]["reported"]["start"] = start_time;
+  }
+
+  if (!reported || both) {
+    doc["state"]["desired"]["timer_state"] = timer_state;
+    doc["state"]["desired"]["start"] = start_time;
+  }
+
+  serializeJson(doc, jsonBuffer);
+  client.publish(get_topic(THINGNAME, true, false), jsonBuffer);
+}
+
 void messageHandler(const String &topic, const String &payload) {
   DEBUG_PRINTLN("incoming: " + topic + " - " + payload);
 
@@ -105,6 +125,24 @@ void messageHandler(const String &topic, const String &payload) {
 
   DEBUG_PRINTLN("desired timer_state: " + timer_state + " start_time " +
                 start_time);
+  if (timer_state == "POMODORO") {  // TODO(ChistokhinSV) add processing for
+                                    // pause and other states?
+    auto current_time = rtc.getEpoch();
+    auto timer_ongoing = current_time - start_time;
+    if (timer_ongoing < 25 * 60) {  // small pomodoro
+      active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
+                              false);
+      active_screen->pomodoro.adjustStart(start_time);
+      // report_state(timer_state, start_time);
+    } else if (timer_ongoing < 45 * 60) {  // big pomodoro
+      active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
+                              true, PomodoroTimer::PomodoroLength::BIG,
+                              PomodoroTimer::RestLength::REST);
+      active_screen->pomodoro.adjustStart(start_time);
+    } else {  // stop if more than 45 minutes
+      report_state("STOPPED", 0, true, true);
+    }
+  }
   //  const char* message = doc["message"];
 }
 
@@ -131,7 +169,9 @@ void connectAWS() {
       DEBUG_PRINTLN("Updating time...");
 
       timeClient.forceUpdate();
-      Serial.println(timeClient.getFormattedTime());
+
+      auto ntp_epoch = timeClient.getEpochTime();
+      rtc.setTime(ntp_epoch);
 
       // configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
@@ -156,11 +196,13 @@ void connectAWS() {
     if (!subscribed) {
       DEBUG_PRINTLN("AWS IoT Connected!");
       client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
-      client.subscribe(get_topic(THINGNAME, true, true));   // updates on UPDATE
+      // client.subscribe(get_topic(THINGNAME, true, true));   // updates on
+      // UPDATE
       subscribed = true;
     }
     int curtime = rtc.getEpoch();
     if (curtime - lastrequest > 5) {
+      set_rtc();
       char jsonBuffer[512];
       StaticJsonDocument<200> doc;
       doc["request"] = "GET SHADOW";

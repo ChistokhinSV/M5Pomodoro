@@ -45,12 +45,13 @@ class screenRender {
 
   screenRender();
   void render();
+  void setState(ScreenState state, bool rest = false,
+                bool report_desired = true,
+                PomodoroTimer::PomodoroLength pomodoro_minutes =
+                    PomodoroTimer::PomodoroLength::SMALL,
+                PomodoroTimer::RestLength pomodoro_rest_minutes =
+                    PomodoroTimer::RestLength::REST_SMALL);
   void update();
-  void setState(
-      ScreenState state,
-      bool rest = false,
-      PomodoroTimer::PomodoroLength pomodoro_minutes = PomodoroTimer::PomodoroLength::SMALL,
-      PomodoroTimer::RestLength pomodoro_rest_minutes = PomodoroTimer::RestLength::REST_SMALL);
 
  private:
   struct WavFile {
