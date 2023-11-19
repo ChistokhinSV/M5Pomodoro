@@ -86,10 +86,8 @@ void screenRender::setState(ScreenState state, bool rest, bool report_desired,
     switch (state) {
       case ScreenState::MainScreen:
         pomodoro.stopTimer();
-        sleepTicker.start();
         break;
       case ScreenState::PomodoroScreen:
-        sleepTicker.stop();
         M5.update();  // clear button state
         pomodoro.setLength(pomodoro_minutes, pomodoro_rest_minutes);
         pomodoro.startTimer(true, rest, report_desired);

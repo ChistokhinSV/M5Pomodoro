@@ -69,18 +69,31 @@ void updateControls() {
     DEBUG_PRINTLN("sleepTicker restarted");
   }
 
-  if (M5.BtnA.wasPressed()) {
-    active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                            true, PomodoroTimer::PomodoroLength::BIG,
-                            PomodoroTimer::RestLength::REST);
-  } else if (M5.BtnB.wasPressed()) {
-    active_screen->setState(screenRender::ScreenState::PomodoroScreen, false,
-                            true, PomodoroTimer::PomodoroLength::SMALL,
-                            PomodoroTimer::RestLength::REST_SMALL);
-  } else if (M5.BtnC.wasPressed()) {
-    active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
-                            true, PomodoroTimer::PomodoroLength::SMALL,
-                            PomodoroTimer::RestLength::REST_SMALL);
+  switch (active_screen->getState()) {
+    case screenRender::ScreenState::MainScreen:
+      if (M5.BtnA.wasPressed()) {
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                false, true, PomodoroTimer::PomodoroLength::BIG,
+                                PomodoroTimer::RestLength::REST);
+      } else if (M5.BtnB.wasPressed()) {
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                false, true,
+                                PomodoroTimer::PomodoroLength::SMALL,
+                                PomodoroTimer::RestLength::REST_SMALL);
+      } else if (M5.BtnC.wasPressed()) {
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
+                                true, PomodoroTimer::PomodoroLength::SMALL,
+                                PomodoroTimer::RestLength::REST_SMALL);
+      }
+      break;
+    case screenRender::ScreenState::PomodoroScreen:
+      // break; // or any other for now - to the main screen
+    default:
+      if (M5.BtnA.wasPressed() || M5.BtnB.wasPressed() ||
+          M5.BtnC.wasPressed()) {
+        active_screen->setState(screenRender::ScreenState::MainScreen);
+      }
+      break;
   }
 }
 
@@ -140,9 +153,14 @@ void messageHandler(const String &topic, const String &payload) {
                               PomodoroTimer::RestLength::REST);
       active_screen->pomodoro.adjustStart(start_time);
     } else {  // stop if more than 45 minutes
+      active_screen->setState(screenRender::ScreenState::MainScreen);
       report_state("STOPPED", 0, true, true);
     }
+  } else if (timer_state == "STOPPED") {
+    active_screen->setState(screenRender::ScreenState::MainScreen);
+    report_state("STOPPED", 0, true, true);
   }
+
   //  const char* message = doc["message"];
 }
 
@@ -168,7 +186,7 @@ void connectAWS() {
     } else {
       DEBUG_PRINTLN("Updating time...");
 
-      timeClient.forceUpdate();
+      timeClient.update();
 
       auto ntp_epoch = timeClient.getEpochTime();
       rtc.setTime(ntp_epoch);

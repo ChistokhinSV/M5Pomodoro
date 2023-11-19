@@ -51,6 +51,7 @@ class screenRender {
                     PomodoroTimer::PomodoroLength::SMALL,
                 PomodoroTimer::RestLength pomodoro_rest_minutes =
                     PomodoroTimer::RestLength::REST_SMALL);
+  ScreenState getState() { return active_state; }
   void update();
 
  private:
