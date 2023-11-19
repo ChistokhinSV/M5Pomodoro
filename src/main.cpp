@@ -145,27 +145,30 @@ void messageHandler(const String &topic, const String &payload) {
                                     // pause and other states?
     auto current_time = rtc.getEpoch();
     auto timer_ongoing = current_time - start_time;
-    if (active_screen->pomodoro.getState() !=
-            PomodoroTimer::PomodoroState::POMODORO ||
-        active_screen->pomodoro.getStartTime() != start_time) {
-      if (timer_ongoing < 25 * 60) {  // small pomodoro
-        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                false, false);
-        active_screen->pomodoro.adjustStart(start_time);
-        // report_state(timer_state, start_time);
-      } else if (timer_ongoing < 45 * 60) {  // big pomodoro
-        active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                false, true, PomodoroTimer::PomodoroLength::BIG,
-                                PomodoroTimer::RestLength::REST);
-        active_screen->pomodoro.adjustStart(start_time);
-      } else {  // stop if more than 45 minutes
-        active_screen->setState(screenRender::ScreenState::MainScreen);
-        report_state("STOPPED", 0, true, true);
-      }
-    }
+
     auto description = state["description"];
     if (description) {
-    active_screen->setTaskName(description);
+      active_screen->setTaskName(description);
+
+      if (active_screen->pomodoro.getState() !=
+              PomodoroTimer::PomodoroState::POMODORO ||
+          active_screen->pomodoro.getStartTime() != start_time) {
+        if (timer_ongoing < 25 * 60) {  // small pomodoro
+          active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                  false, false);
+          active_screen->pomodoro.adjustStart(start_time);
+          // report_state(timer_state, start_time);
+        } else if (timer_ongoing < 45 * 60) {  // big pomodoro
+          active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                  false, true,
+                                  PomodoroTimer::PomodoroLength::BIG,
+                                  PomodoroTimer::RestLength::REST);
+          active_screen->pomodoro.adjustStart(start_time);
+        } else {  // stop if more than 45 minutes
+          active_screen->setState(screenRender::ScreenState::MainScreen);
+          report_state("STOPPED", 0, true, true);
+        }
+      }
     }
 
   } else if (timer_state == "STOPPED") {
