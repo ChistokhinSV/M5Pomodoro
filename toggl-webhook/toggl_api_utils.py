@@ -7,6 +7,11 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 toggl_api_url = 'https://api.track.toggl.com/api/v9'
 
 def api_request(url:str, api_method = "GET", request_body = {}):
@@ -38,7 +43,7 @@ def api_request(url:str, api_method = "GET", request_body = {}):
         return None
 
 def get_project_name_and_color(workspace_id, project_id):
-    logger.debug(f'get_project_name. workspace_id: {workspace_id} project_id: {project_id}')
+    logger.info(f'get_project_name. workspace_id: {workspace_id} project_id: {project_id}')
     if not workspace_id or not project_id:
         return None, None
     response = api_request(f'/workspaces/{workspace_id}/projects/{project_id}')
@@ -116,7 +121,7 @@ def start_timer(workspace_id:int, start_time = None):
     "stop": None,
     "duration": -1,
     "created_with" : "M5Pomodoro",
-    "description": last_entry.get('description', None),
+    "description": last_entry.get('description', ''),
     "tags": last_entry.get('tags', None),
     "tag_ids": last_entry.get('tag_ids', None),
     }

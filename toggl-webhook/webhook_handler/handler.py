@@ -7,6 +7,12 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
 queue_name = os.environ['QUEUE_NAME']
 
 def hmac_is_valid(message, signature, secret):

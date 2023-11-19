@@ -6,6 +6,10 @@ from event_processing.google_calendar_event import google_calendar
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 min_event_time = int(os.environ['MIN_EVENT_TIME'])
 default_event_time = int(os.environ['DEFAULT_EVENT_TIME'])

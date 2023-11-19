@@ -11,6 +11,12 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('[%(levelname)s | %(name)s:%(lineno)d] %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
 bucket_name = os.environ['BUCKET_NAME']
 secret_region_name = os.environ['SECRET_REGION_NAME']
 if len(secret_region_name) == 0: secret_region_name = None
