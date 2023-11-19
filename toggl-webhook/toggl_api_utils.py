@@ -39,6 +39,8 @@ def api_request(url:str, api_method = "GET", request_body = {}):
 
 def get_project_name_and_color(workspace_id, project_id):
     logger.debug(f'get_project_name. workspace_id: {workspace_id} project_id: {project_id}')
+    if not workspace_id or not project_id:
+        return None, None
     response = api_request(f'/workspaces/{workspace_id}/projects/{project_id}')
     if response is None:
         return None, None
@@ -99,19 +101,63 @@ def start_timer(workspace_id:int, start_time = None):
     if current_timer:
         logger.info(f'Timer already running, no need to restart it (?)')
         # stop_timer(workspace_id)
-        return
+        return None, None
     start_time_str = format_time_epoch(start_time)
+    last_entry = get_last_time_entry()
+    if last_entry and last_entry.get('workspace_id') != workspace_id:
+        # no workspace_id filtering in Toggl API
+        # If id is different from provided - just ignore last result
+        last_entry = {}
+    project_name, color = get_project_name_and_color(last_entry.get('workspace_id', None), last_entry.get('project_id', None))
     request_body = {
     "workspace_id": workspace_id,
+    "project_id": last_entry.get('project_id', None),
     "start": start_time_str,
     "stop": None,
     "duration": -1,
     "created_with" : "M5Pomodoro",
-    "description": "Hardware timer entry",
+    "description": last_entry.get('description', None),
+    "tags": last_entry.get('tags', None),
+    "tag_ids": last_entry.get('tag_ids', None),
     }
     response = api_request(f'workspaces/{workspace_id}/time_entries', "POST", request_body)
     logger.info(f'start_timer response:{response.status_code}, {response.text}')
     if response.status_code == 200:
-        return response.json()
+        return project_name, color
+    else:
+        return None, None
+
+def get_last_time_entry():
+    logger.debug(f'get_last_time_entry')
+    response = api_request(f'me/time_entries')
+    if response is None:
+        return None
+
+    logger.info(f'get_last_time_entry response: code {response.status_code}, {len(response.json())} entries')
+
+    time_entries = response.json()
+    if time_entries and len(time_entries) > 0:
+        time_entry = time_entries[0]
+        return time_entry
     else:
         return None
+
+def get_last_project():
+    last_entry = get_last_time_entry()
+    if last_entry:
+        return last_entry.get('project_id', None)
+    else:
+        return None
+
+def get_last_name_and_color():
+    last_entry = get_last_time_entry()
+    project_id = last_entry.get('project_id', None)
+
+    if project_id:
+        workspace_id = last_entry.get('workspace_id', None)
+        if workspace_id and project_id:
+            return get_project_name_and_color(workspace_id, project_id)
+        else:
+            return None, None
+    else:
+        return None, None
