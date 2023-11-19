@@ -68,11 +68,31 @@ def update_device_shadow(thing_name, payload):
         logger.error(f"Invalid thing name ({thing_name})")
         return None
 
+    logger.info(f"update_device_shadow payload: {payload}")
+
     # Create an IoT client
     client = boto3.client('iot-data')
 
     # Convert the payload dictionary to a JSON string
     payload_str = json.dumps(payload)
+
+    current_shadow = client.get_thing_shadow(thingName=thing_name)
+    try:
+        shadow_json = json.loads(current_shadow['payload'].read())
+        logger.info(f"current_shadow: {shadow_json}")
+    except Exception as e:
+        shadow_json = None
+        logger.error(f"Error reading shadow: {e}")
+
+    try:
+        prevstate = shadow_json['state']['desired']['timer_state']
+    except Exception as e:
+        prevstate = None
+        logger.error(f"Error reading shadow: {e}")
+
+    if prevstate and prevstate == 'REST':
+        logger.info(f"Timer is in REST state, no need to do anything")
+        return None
 
     # Update the device shadow
     response = client.update_thing_shadow(

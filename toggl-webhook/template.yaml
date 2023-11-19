@@ -11,6 +11,7 @@ Globals:
         THING_NAME: !Ref ThingName
         QUEUE_NAME: !Ref TogglWebhookQueue
         TOGGL_API_TOKEN: !Ref TogglAPI
+        TOGGL_WID: !Ref TogglWID
 
 Parameters:
   CalendarID:
@@ -29,6 +30,10 @@ Parameters:
     Type: String
     Description: An environment variable for Toggl API Token
     Default: ""
+  TogglWID:
+    Type: Number
+    Description: An environment variable for Toggl Workspace ID
+    Default: "0"
   SecretRegionName:
     Type: String
     Description: Region, where AWS Secrets is stored (if empty - current region)
@@ -55,6 +60,38 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: toggl-webhook-queue
+  DeviceShadowChangeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: timer_lambda.timer.lambda_handler
+      Runtime: python3.11
+      Events:
+        ShadowUpdate:
+          Type: IoTRule
+          Properties:
+            Sql: !Sub "SELECT * FROM '$aws/things/${ThingName}/shadow/update/documents'"
+            AwsIotSqlVersion: '2016-03-23'
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - iot:Receive
+                - iot:GetThingShadow
+                - iot:UpdateThingShadow
+              Resource:
+                - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
+  DeviceShadowUpdateRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: DeviceShadowUpdateRule
+      TopicRulePayload:
+        Sql: !Sub "SELECT * FROM '$aws/things/${ThingName}/shadow/update/documents'"
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt DeviceShadowChangeFunction.Arn
   TogglEventProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -126,6 +163,7 @@ Resources:
             - Effect: Allow
               Action:
                 - iot:UpdateThingShadow
+                - iot:GetThingShadow
               Resource:
                 - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
 
