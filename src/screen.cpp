@@ -45,12 +45,6 @@ screenRender::screenRender()
   screen_center_x = screen_width / 2;
   screen_center_y = screen_height / 2;
 
-  if (loadWavFile(DING_SOUND, &sound_ding)) {
-    DEBUG_PRINTLN("WAV file loaded into memory");
-  } else {
-    DEBUG_PRINTLN("Failed to load WAV file");
-  }
-
   back_buffer.setColorDepth(M5.Lcd.getColorDepth());
   back_buffer.setPsram(true);
   back_buffer.createSprite(screen_width, screen_height);
@@ -95,12 +89,6 @@ void screenRender::setState(ScreenState state, bool rest, bool report_desired,
       default:
         break;
     }
-
-    M5.Power.setVibration(128);
-    ding();
-    delay(500);
-    M5.Power.setVibration(0);
-
     active_state = state;
   }
 }
@@ -138,33 +126,6 @@ void screenRender::setCompletion(int width, CRGB color) {
     leds[i] = color;
   }
   FastLED.show();
-}
-
-void screenRender::ding() {
-  M5.Speaker.playWav(sound_ding.data, sound_ding.size);
-}
-
-bool screenRender::loadWavFile(const char* filename, WavFile* wavFile) {
-  if (wavFile == nullptr) {
-    return false;  // Pointer is null, cannot proceed
-  }
-
-  File file = LittleFS.open(filename, "r");
-  if (!file) {
-    Serial.printf("Failed to open % for reading", filename);
-    return false;
-  }
-
-  wavFile->size = file.size();
-  wavFile->data = new uint8_t[wavFile->size];
-  if (file.read(wavFile->data, wavFile->size) != wavFile->size) {
-    Serial.println("Failed to read file into memory");
-    delete[] wavFile->data;
-    return false;
-  }
-
-  file.close();
-  return true;
 }
 
 void screenRender::pushBackBuffer() {

@@ -29,7 +29,12 @@ PomodoroTimer::PomodoroTimer(
       pomodoroTimeEnd(0),
       pauseTime(0),
       pomodoroTicker([this] { this->loop(); }, 1000) {
-  DEBUG_PRINTLN("PomodoroTimer initalized")
+  if (loadWavFile(DING_SOUND, &sound_ding)) {
+    DEBUG_PRINTLN("WAV file loaded into memory");
+  } else {
+    DEBUG_PRINTLN("Failed to load WAV file");
+  }
+  DEBUG_PRINTLN("PomodoroTimer initalized");
 }
 
 void PomodoroTimer::startTimer(bool reset_timer, bool rest,
@@ -57,6 +62,7 @@ void PomodoroTimer::startTimer(bool reset_timer, bool rest,
   } else {
     report_state(state, pomodoroTimeStart);
   }
+  ding();
 }
 
 void PomodoroTimer::adjustStart(uint32_t startTime) {
@@ -90,6 +96,7 @@ void PomodoroTimer::stopTimer(bool pause) {
   timerState = pause ? PomodoroState::PAUSED : PomodoroState::STOPPED;
   pomodoroTicker.stop();
   report_state(pause ? "PAUSED" : "STOPPED", pomodoroTimeStart, true, true);
+  ding();
 }
 
 void PomodoroTimer::pauseTimer() { stopTimer(true); }
@@ -164,6 +171,36 @@ void PomodoroTimer::loop() {
       stopTimer();
     }
   }
+}
+
+void PomodoroTimer::ding() {
+    M5.Power.setVibration(128);
+    M5.Speaker.playWav(sound_ding.data, sound_ding.size);
+    delay(500);
+    M5.Power.setVibration(0);
+}
+
+bool PomodoroTimer::loadWavFile(const char* filename, WavFile* wavFile) {
+  if (wavFile == nullptr) {
+    return false;  // Pointer is null, cannot proceed
+  }
+
+  File file = LittleFS.open(filename, "r");
+  if (!file) {
+    Serial.printf("Failed to open % for reading", filename);
+    return false;
+  }
+
+  wavFile->size = file.size();
+  wavFile->data = new uint8_t[wavFile->size];
+  if (file.read(wavFile->data, wavFile->size) != wavFile->size) {
+    Serial.println("Failed to read file into memory");
+    delete[] wavFile->data;
+    return false;
+  }
+
+  file.close();
+  return true;
 }
 
 void PomodoroTimer::update() { pomodoroTicker.update(); }

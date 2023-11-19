@@ -11,6 +11,8 @@ Copyright 2023 Sergei Chistokhin
 #include <stdint.h>
 #include <string>
 
+#define DING_SOUND "/bell.wav"
+
 class PomodoroTimer {
  public:
   enum class PomodoroLength { SMALL = 25, BIG = 45, MICRO = 5 };
@@ -46,6 +48,13 @@ class PomodoroTimer {
   int toInt(RestLength length);
 
  private:
+  struct WavFile {
+    uint8_t* data;
+    size_t size;
+  };
+
+  WavFile sound_ding;
+
   PomodoroState timerState;
   Ticker pomodoroTicker;
 
@@ -57,4 +66,7 @@ class PomodoroTimer {
   uint32_t pauseTime;
 
   void loop();
+
+  void ding();
+  bool loadWavFile(const char* filename, WavFile* wavFile);
 };

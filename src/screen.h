@@ -13,7 +13,6 @@ Copyright 2023 Sergei Chistokhin
 #include <PomodoroTimer.h>
 
 #define BACKGROUND "/background1.png"
-#define DING_SOUND "/bell.wav"
 
 #define SMALL_FONT &fonts::Orbitron_Light_24
 #define LARGE_FONT &fonts::Orbitron_Light_32
@@ -55,13 +54,6 @@ class screenRender {
   void update();
 
  private:
-  struct WavFile {
-    uint8_t* data;
-    size_t size;
-  };
-
-  WavFile sound_ding;
-
   ScreenState active_state;
   M5Canvas back_buffer;
   int lastrender;
@@ -85,7 +77,5 @@ class screenRender {
   void drawStatusIcons();
   void drawTaskName(String task_name, int prev_font_height = 0);
   void setCompletion(int width, CRGB color = CRGB::White);
-  void ding();
-  bool loadWavFile(const char* filename, WavFile* wavFile);
   void pushBackBuffer();
 };
