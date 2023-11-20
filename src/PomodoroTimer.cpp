@@ -28,7 +28,7 @@ PomodoroTimer::PomodoroTimer(
       pomodoroTimeStart(0),
       pomodoroTimeEnd(0),
       pauseTime(0),
-      pomodoroTicker([this] { this->loop(); }, 1000) {
+      pomodoroTicker([this] { this->tick(); }, 1000) {
   if (loadWavFile(DING_SOUND, &sound_ding)) {
     DEBUG_PRINTLN("WAV file loaded into memory");
   } else {
@@ -101,20 +101,14 @@ void PomodoroTimer::stopTimer(bool pause) {
 
 void PomodoroTimer::pauseTimer() { stopTimer(true); }
 
-bool PomodoroTimer::isRest() { return timerState == PomodoroState::REST; }
 
-bool PomodoroTimer::isRunning() { return timerState != PomodoroState::STOPPED; }
 
-PomodoroTimer::PomodoroState PomodoroTimer::getState() { return timerState; }
-
-int PomodoroTimer::getTimerPercentage() {
+int PomodoroTimer::getTimerPercentage() const {
   int timeleft = getRemainingTime();
   int timerLen = timerState == PomodoroState::REST ? restMinutes * 60
                                                    : pomodoroMinutes * 60;
   return 100 - ((timeleft * 100) / timerLen);
 }
-
-uint32_t PomodoroTimer::getStartTime() { return pomodoroTimeStart; }
 
 void PomodoroTimer::setLength(PomodoroLength pomodoroLength,
                               RestLength restLength) {
@@ -130,7 +124,7 @@ void PomodoroTimer::setRest(RestLength restLength) {
   restMinutes = toInt(restLength);
 }
 
-uint32_t PomodoroTimer::getRemainingTime() {
+uint32_t PomodoroTimer::getRemainingTime() const {
   switch (timerState) {
     case PomodoroState::PAUSED:
       return pauseTime;
@@ -146,7 +140,7 @@ uint32_t PomodoroTimer::getRemainingTime() {
   }
 }
 
-std::string PomodoroTimer::formattedTime() {
+std::string PomodoroTimer::formattedTime() const {
   uint32_t remainingTime = getRemainingTime();
   uint32_t minutes = remainingTime / 60;
   uint32_t seconds = remainingTime % 60;
@@ -163,7 +157,7 @@ int PomodoroTimer::toInt(PomodoroLength length) {
 
 int PomodoroTimer::toInt(RestLength length) { return static_cast<int>(length); }
 
-void PomodoroTimer::loop() {
+void PomodoroTimer::tick() {
   if (getRemainingTime() <= 0) {
     if (timerState == PomodoroState::POMODORO) {
       startRest();
@@ -173,7 +167,7 @@ void PomodoroTimer::loop() {
   }
 }
 
-void PomodoroTimer::ding() {
+void PomodoroTimer::ding() const {
     M5.Power.setVibration(128);
     M5.Speaker.playWav(sound_ding.data, sound_ding.size);
     delay(500);

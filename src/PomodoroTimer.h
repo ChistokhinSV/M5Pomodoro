@@ -9,6 +9,7 @@ Copyright 2023 Sergei Chistokhin
 #include <ESP32Time.h>
 #include <Ticker.h>
 #include <stdint.h>
+
 #include <string>
 
 #define DING_SOUND "/bell.wav"
@@ -22,7 +23,8 @@ class PomodoroTimer {
   PomodoroTimer(PomodoroLength pomodoroLength = PomodoroLength::SMALL,
                 RestLength restLength = RestLength::REST_SMALL);
 
-  void startTimer(bool reset_timer = true, bool rest = false, bool report_desired = true);
+  void startTimer(bool reset_timer = true, bool rest = false,
+                  bool report_desired = true);
   void adjustStart(uint32_t startTime);
   void startRest();
   void stopTimer(bool pause = false);
@@ -30,22 +32,22 @@ class PomodoroTimer {
 
   void update();
 
-  bool isRest();
-  bool isRunning();
+  bool isRest() const { return timerState == PomodoroState::REST; }
+  bool isRunning() { return timerState != PomodoroState::STOPPED; }
 
-  PomodoroState getState();
-  int getTimerPercentage();
-  uint32_t getStartTime();
+  PomodoroState getState() const { return timerState; }
+  int getTimerPercentage() const;
+  uint32_t getStartTime() const { return pomodoroTimeStart; }
 
   void setLength(PomodoroLength pomodoroLength, RestLength restLength);
   void setLength(PomodoroLength pomodoroLength);
   void setRest(RestLength restLength);
 
-  uint32_t getRemainingTime();  // returns time in seconds
-  std::string formattedTime();
+  uint32_t getRemainingTime() const;  // returns time in seconds
+  std::string formattedTime() const;
 
-  int toInt(PomodoroLength length);
-  int toInt(RestLength length);
+  static int toInt(PomodoroLength length);
+  static int toInt(RestLength length);
 
  private:
   struct WavFile {
@@ -65,8 +67,8 @@ class PomodoroTimer {
   uint32_t pomodoroTimeEnd;
   uint32_t pauseTime;
 
-  void loop();
+  void tick();
 
-  void ding();
+  void ding() const;
   bool loadWavFile(const char* filename, WavFile* wavFile);
 };

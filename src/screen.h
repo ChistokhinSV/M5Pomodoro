@@ -50,10 +50,10 @@ class screenRender {
                     PomodoroTimer::PomodoroLength::SMALL,
                 PomodoroTimer::RestLength pomodoro_rest_minutes =
                     PomodoroTimer::RestLength::REST_SMALL);
-  ScreenState getState() { return active_state; }
+  ScreenState getState() const { return active_state; }
   void update();
   void setTaskName(String taskName) { description = taskName; }
-  String getTaskName() { return description; }
+  String getTaskName() const { return description; }
 
  private:
   ScreenState active_state;
