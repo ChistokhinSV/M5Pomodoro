@@ -105,11 +105,21 @@ void screenRender::drawProgressBar(int x, int y, int w, int h, int val,
 void screenRender::drawStatusIcons() {
   // at least draw a progress bar to show battery level
   int battery = M5.Power.getBatteryLevel();
+  int power_drain = M5.Power.getBatteryCurrent();
+  String power_drain_str = String(power_drain) + " mA";
   int w = 40;
   int h = 10;
   int border = 2;
-  drawProgressBar(screen_width - w - border, 0, w, h + border, battery,
+  auto icon_x = screen_width - w - border;
+  back_buffer.setTextSize(0);
+  drawProgressBar(icon_x, 0, w, h + border, battery,
                   TFT_RED);
+  back_buffer.setTextColor(TFT_WHITE);
+  back_buffer.drawString(String(battery), icon_x + w/2, h/2 + border, &Font8x8C64);
+
+  back_buffer.setTextDatum(textdatum_t::top_left);
+  back_buffer.drawString(power_drain_str, border, h/2 + border, &Font8x8C64);
+  back_buffer.setTextDatum(textdatum_t::middle_center);
 }
 
 void screenRender::drawTaskName(String task_name, int prev_font_height) {
@@ -117,7 +127,7 @@ void screenRender::drawTaskName(String task_name, int prev_font_height) {
     back_buffer.setTextSize(0);
     back_buffer.setFont(SMALL_FONT);
     back_buffer.drawString(task_name, screen_center_x,
-                           screen_center_y - prev_font_height / 2 - 20);
+                           screen_center_y - prev_font_height / 2 - 30);
   }
 }
 
