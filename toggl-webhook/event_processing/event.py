@@ -18,14 +18,17 @@ def event_processing(event, context):
     for record in event['Records']:
         # Each record will contain a message from the SQS queue
         logger.info(f'Processing record: {record}')
+
         record_body = json.loads(record['body'])
-        payload = record_body.get('payload', None)
+        toggl_event = record_body.get('Message', None)
+        if toggl_event: toggl_event = json.loads(toggl_event)
+        payload = toggl_event.get('payload', None)
 
         if payload == None:
             logger.error(f'No payload!')
             return
 
-        event_metadata = record_body.get('metadata', None)
+        event_metadata = toggl_event.get('metadata', None)
         if event_metadata: event_action = event_metadata.get('action', None)
         else: event_action = None
         logger.info(f'Message payload from queue: {payload}, action: {event_action}')
@@ -44,17 +47,17 @@ def event_processing(event, context):
                 if start and stop and duration and duration >= min_event_time:
                     # if both start and stop are present and duration > min_event_time sec,
                     # create an event in Google Calendar
-                    event_result = google_calendar( record_body, event_action)
+                    event_result = google_calendar( toggl_event, event_action)
                 elif start and stop and duration and duration < min_event_time:
                     # if less than min_event_time, delete the event in Google Calendar
                     logger.debug(f'Deleting event with duration < {min_event_time} seconds')
-                    event_result = google_calendar(record_body, 'deleted')
+                    event_result = google_calendar(toggl_event, 'deleted')
                 elif start and stop == None: # if only start present - create default_event_time long entry
                     logger.debug(f'Creating default_event_time ({default_event_time} minutes) long event')
                     stop_time_obj = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')\
                         + timedelta(minutes=default_event_time)
                     record_body['payload']['stop'] = stop_time_obj.strftime('%Y-%m-%dT%H:%M:%SZ')
-                    event_result = google_calendar(record_body, event_action)
+                    event_result = google_calendar(toggl_event, event_action)
                 try:
                     status_code = event_result.get('statusCode', None)
                 except:

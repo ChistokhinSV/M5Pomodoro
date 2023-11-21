@@ -10,6 +10,7 @@ Globals:
       Variables:
         THING_NAME: !Ref ThingName
         QUEUE_NAME: !Ref TogglWebhookQueue
+        SNS_NAME: !Ref TogglWebhookSNSTopic
         TOGGL_API_TOKEN: !Ref TogglAPI
         TOGGL_WID: !Ref TogglWID
 
@@ -52,14 +53,61 @@ Parameters:
     Default: ""
 
 Resources:
-  TogglWebhookBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: toggl-webhook-bucket
+  TogglWebhookSNSTopic:
+    Type: AWS::SNS::Topic
   TogglWebhookQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: toggl-webhook-queue
+  # Policy allows SNS to publish to this SQS queue
+  SnsToSqsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TogglWebhookQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow SNS publish to SQS"
+            Effect: Allow
+            Principal:
+              Service: "sns.amazonaws.com"
+            Resource: !GetAtt TogglWebhookQueue.Arn
+            Action: SQS:SendMessage
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TogglWebhookSNSTopic
+  TogglWebhookSNSHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: sns_handler.sns_handler.lambda_handler
+      Runtime: python3.11
+      Events:
+        SnsEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref TogglWebhookSNSTopic
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - iot:UpdateThingShadow
+                - iot:GetThingShadow
+              Resource:
+                - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
+  TogglWebhookBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: toggl-webhook-bucket
+  TogglWebhookQueueSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TogglWebhookSNSTopic
+      Protocol: sqs
+      Endpoint: !GetAtt TogglWebhookQueue.Arn
   DeviceShadowChangeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -155,17 +203,9 @@ Resources:
         Variables:
           TOGGL_SIGNATURE: !Ref TogglSIG
       Policies:
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt TogglWebhookQueue.QueueName
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt TogglWebhookSNSTopic.TopicName
         - AWSLambdaBasicExecutionRole
-        - Version: '2012-10-17' # Policy version
-          Statement:
-            - Effect: Allow
-              Action:
-                - iot:UpdateThingShadow
-                - iot:GetThingShadow
-              Resource:
-                - !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:thing/${ThingName}"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

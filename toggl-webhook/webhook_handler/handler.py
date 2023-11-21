@@ -13,7 +13,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-queue_name = os.environ['QUEUE_NAME']
+sns_name = os.environ['SNS_NAME']
 
 def hmac_is_valid(message, signature, secret):
     '''
@@ -82,27 +82,15 @@ def webhook_handler(event, context):
         logger.info('Ping!')
         return simple_ok
     else:
-        logger.debug('Queueing event')
         event_data = json.dumps(toggl_event)
+        logger.debug(f'Message to SNS: {event_data}')
         # Send the event data to the SQS queue
-        sqs_client = boto3.client('sqs')
-        response = sqs_client.send_message(
-            QueueUrl=queue_name,
-            MessageBody=event_data
+        sns_client = boto3.client('sns')
+        response = sns_client.publish(
+            TopicArn=sns_name,
+            Subject="Toggl event",
+            Message=event_data
         )
-        logger.info(f'Message sent to SQS: {response}')
+        logger.info(f'Message sent to SNS: {response}')
 
-        start = payload.get('start', None)
-        stop = payload.get('stop', None)
-        tags = payload.get('tags', [])
-        if not tags: tags = []
-
-        logger.info(f'start: {start}, stop: {stop}, tags: {tags}')
-
-        if (start or stop) and not 'pomodoro-break' in tags:
-            logger.debug(f'Updating timer')
-            from mqtt_utils import update_thing_timer
-            update_response = update_thing_timer()
-            logger.info(f'Timer updated: {update_response}')
-
-        return simple_ok
+    return simple_ok
