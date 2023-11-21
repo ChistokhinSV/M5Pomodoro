@@ -12,6 +12,7 @@ Copyright 2023 Sergei Chistokhin
 #include <esp_bt.h>
 #include <esp_bt_main.h>
 #include <esp_wifi.h>
+#include <WiFi.h>
 
 #include <string>
 
@@ -112,7 +113,7 @@ void screenRender::drawStatusIcons() {
   int border = 2;
   auto icon_x = screen_width - w - border;
   back_buffer.setTextSize(0);
-  drawProgressBar(icon_x, 0, w, h + border, battery,
+  drawProgressBar(icon_x, border, w, h + border, battery,
                   TFT_RED);
   back_buffer.setTextColor(TFT_WHITE);
   back_buffer.drawString(String(battery), icon_x + w/2, h/2 + border, &Font8x8C64);
@@ -120,6 +121,15 @@ void screenRender::drawStatusIcons() {
   back_buffer.setTextDatum(textdatum_t::top_left);
   back_buffer.drawString(power_drain_str, border, h/2 + border, &Font8x8C64);
   back_buffer.setTextDatum(textdatum_t::middle_center);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    back_buffer.drawPngFile(LittleFS, ICON_WIFI, icon_x - border - h, border);
+  } else {
+    back_buffer.drawPngFile(LittleFS, ICON_NOWIFI, icon_x - border - h, border);
+  }
+  if (client.connected()) {
+    back_buffer.drawPngFile(LittleFS, ICON_MQTT, icon_x - (border + h)*2, border);
+  }
 }
 
 void screenRender::drawTaskName(String task_name, int prev_font_height) {

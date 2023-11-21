@@ -13,6 +13,9 @@ Copyright 2023 Sergei Chistokhin
 #include <PomodoroTimer.h>
 
 #define BACKGROUND "/background1.png"
+#define ICON_MQTT "/MQTT.png"
+#define ICON_WIFI "/WIFI.png"
+#define ICON_NOWIFI "/NOWIFI.png"
 
 #define SMALL_FONT &fonts::Orbitron_Light_24
 #define LARGE_FONT &fonts::Orbitron_Light_32
