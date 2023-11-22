@@ -19,8 +19,8 @@ def event_processing(event, context):
         # Each record will contain a message from the SQS queue
         logger.info(f'Processing record: {record}')
 
-        record_body = json.loads(record['body'])
-        toggl_event = record_body.get('Message', None)
+        record_body_decoded = json.loads(record['body'])
+        toggl_event = record_body_decoded.get('Message', None)
         if toggl_event: toggl_event = json.loads(toggl_event)
         payload = toggl_event.get('payload', None)
 
@@ -56,7 +56,7 @@ def event_processing(event, context):
                     logger.debug(f'Creating default_event_time ({default_event_time} minutes) long event')
                     stop_time_obj = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')\
                         + timedelta(minutes=default_event_time)
-                    record_body['payload']['stop'] = stop_time_obj.strftime('%Y-%m-%dT%H:%M:%SZ')
+                    payload['stop'] = stop_time_obj.strftime('%Y-%m-%dT%H:%M:%SZ')
                     event_result = google_calendar(toggl_event, event_action)
                 try:
                     status_code = event_result.get('statusCode', None)
@@ -67,7 +67,7 @@ def event_processing(event, context):
                     return event_result
                 if event_result == None:
                     logger.error(f'Event without event_result!\
-                        action: {event_action} start:{start} stop:{stop} duration: {duration} record: {record_body}')
+                        action: {event_action} start:{start} stop:{stop} duration: {duration} record: {payload}')
                 else:
                     logger.debug(f'Event created: {event_result}')
                 return
