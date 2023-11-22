@@ -104,31 +104,35 @@ def stop_timer(workspace_id:int, stop_time = None):
 
 def start_timer(workspace_id:int, start_time = None):
     current_timer = get_current_time_entry()
-    if current_timer:
-        logger.info('Timer already running, no need to restart it (?)')
-        # stop_timer(workspace_id)
-        return None, None
-    start_time_str = format_time_epoch(start_time)
     last_entry = get_last_time_entry()
+
     if last_entry and last_entry.get('workspace_id') != workspace_id:
         # no workspace_id filtering in Toggl API
         # If id is different from provided - just ignore last result
         last_entry = {}
     project_name, color = get_project_name_and_color(last_entry.get('workspace_id', None), last_entry.get('project_id', None))
-    request_body = {
-    "workspace_id": workspace_id,
-    "project_id": last_entry.get('project_id', None),
-    "start": start_time_str,
-    "stop": None,
-    "duration": -1,
-    "created_with" : "M5Pomodoro",
-    "description": last_entry.get('description', ''),
-    "tags": last_entry.get('tags', None),
-    "tag_ids": last_entry.get('tag_ids', None),
-    }
-    response = api_request(f'workspaces/{workspace_id}/time_entries', "POST", request_body)
-    logger.info(f'start_timer response:{response.status_code}, {response.text}')
-    if response.status_code == 200:
+
+    if current_timer:
+        logger.info('Timer already running, no need to restart it (?)')
+        # stop_timer(workspace_id)
+    else:
+        start_time_str = format_time_epoch(start_time)
+        logger.info(f'Starting timer from {start_time}={start_time_str}')
+        request_body = {
+        "workspace_id": workspace_id,
+        "project_id": last_entry.get('project_id', None),
+        "start": start_time_str,
+        "stop": None,
+        "duration": -1,
+        "created_with" : "M5Pomodoro",
+        "description": last_entry.get('description', ''),
+        "tags": last_entry.get('tags', None),
+        "tag_ids": last_entry.get('tag_ids', None),
+        }
+        response = api_request(f'workspaces/{workspace_id}/time_entries', "POST", request_body)
+        logger.info(f'start_timer response:{response.status_code}, {response.text}')
+
+    if current_timer or response.status_code == 200:
         return project_name, color
     else:
         return None, None
