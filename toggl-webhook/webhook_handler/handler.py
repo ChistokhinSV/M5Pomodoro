@@ -33,19 +33,23 @@ def webhook_handler(event, context):
     headers = event.get('headers', None)
     signature = headers.get('x-webhook-signature-256', None) if headers else None
     event_metadata = toggl_event.get('metadata', None)
-    if event_metadata: event_action = event_metadata.get('action', None)
-    else: event_action = None
+    if event_metadata:
+        event_action = event_metadata.get('action', None)
+    else:
+        event_action = None
     logger.info(f'toggl_event: {toggl_event}, signature: {signature}, action: {event_action}')
 
-    try: signature_env = os.getenv('TOGGL_SIGNATURE')
+    try:
+        signature_env = os.getenv('TOGGL_SIGNATURE')
     except Exception as e:
         signature_env = None
-        logger.ingo(f'No TOGGL_SIGNATURE found, validation disabled!')
-    if signature_env and len(signature_env) == 0: signature_env = None
+        logger.ingo(f'No TOGGL_SIGNATURE found, validation disabled!: {e}')
+    if signature_env and len(signature_env) == 0:
+        signature_env = None
 
     # there is setup TOGGL_SIGNATURE but signature is not included
     if not signature and signature_env:
-        logger.error(f'No signature included, aborting')
+        logger.error('No signature included, aborting')
         return {
             'statusCode': 401,
             'body': json.dumps('No signature included')
@@ -53,14 +57,15 @@ def webhook_handler(event, context):
 
     # there is setup TOGGL_SIGNATURE but signature is not valid
     if signature_env and not hmac_is_valid(event['body'], signature, signature_env):
-        logger.error(f'Invalid signature, aborting')
+        logger.error('Invalid signature, aborting')
         return {
             'statusCode': 401,
             'body': json.dumps('Invalid signature')
         }
 
     payload = toggl_event.get('payload', None)
-    if payload and type(payload) == str: payload = payload.lower()
+    if payload and isinstance(payload, str):
+        payload = payload.lower()
     logger.debug(f'event payload: {payload}')
 
     validation_code = toggl_event.get('validation_code', None)

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import os
 import boto3
 import json
@@ -104,7 +104,7 @@ def update_device_shadow(thing_name, payload):
         logger.error(f"Error reading shadow: {e}")
 
     if prevstate and prevstate == 'REST':
-        logger.info(f"Timer is in REST state, no need to do anything")
+        logger.info("Timer is in REST state, no need to do anything")
         return None
 
     # Update the device shadow

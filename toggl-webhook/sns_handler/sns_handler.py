@@ -1,5 +1,4 @@
 import json
-import logging
 
 import logging
 logger = logging.getLogger(__name__)
@@ -21,26 +20,27 @@ def lambda_handler(event, context):
         record_body = record['Sns']
         message = json.loads(record_body.get('Message', None))
         payload = message.get('payload', None)
-        if payload != None:
+        if payload is not None:
             logger.info(f'SNS message payload: {payload}')
         else:
-            logger.error(f'No payload in SNS message!')
+            logger.error('No payload in SNS message!')
             return
 
         start = payload.get('start', None)
         stop = payload.get('stop', None)
         tags = payload.get('tags', [])
-        if not tags: tags = []
+        if not tags:
+            tags = []
 
         logger.info(f'start: {start}, stop: {stop}, tags: {tags}')
 
-        if (start or stop) and not 'pomodoro-break' in tags:
-            logger.debug(f'Updating timer')
+        if (start or stop) and 'pomodoro-break' not in tags:
+            logger.debug('Updating timer')
             from mqtt_utils import update_thing_timer
             update_response = update_thing_timer()
             logger.info(f'Timer updated: {update_response}')
 
-    logger.info(f'SNS handler OK')
+    logger.info('SNS handler OK')
     return {
         'statusCode': 200,
         'body': json.dumps('SNS handler OK')

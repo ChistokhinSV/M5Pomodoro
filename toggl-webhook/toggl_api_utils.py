@@ -18,7 +18,7 @@ def api_request(url:str, api_method = "GET", request_body = {}):
     toggl_api_key = os.environ['TOGGL_API_TOKEN']
 
     if 'TEMPLATE!' in toggl_api_key or toggl_api_key == '':
-        logger.error(f'Error getting environment variable: TOGGL_API_KEY')
+        logger.error('Error getting environment variable: TOGGL_API_KEY')
         return None
 
     toggl_api_key = base64.b64encode(f'{toggl_api_key}:api_token'.encode()).decode()
@@ -28,7 +28,8 @@ def api_request(url:str, api_method = "GET", request_body = {}):
         'Authorization': f'Basic {toggl_api_key}'
     }
 
-    if url[0] != '/':  url = '/' + url
+    if url[0] != '/':
+        url = '/' + url
 
     try:
         if api_method == "POST":
@@ -57,8 +58,8 @@ def get_project_name_and_color(workspace_id, project_id):
     return project_name, project_color
 
 def get_current_time_entry():
-    logger.debug(f'get_current_time_entry')
-    response = api_request(f'me/time_entries/current')
+    logger.debug('get_current_time_entry')
+    response = api_request('me/time_entries/current')
     if response is None:
         return None
 
@@ -81,7 +82,7 @@ def format_time_epoch(time = None):
 def stop_timer(workspace_id:int, stop_time = None):
     current_timer = get_current_time_entry()
     if not current_timer:
-        logger.info(f'No timer running')
+        logger.info('No timer running')
         return
     stop_time_str = format_time_epoch(stop_time)
     request_body = {
@@ -104,7 +105,7 @@ def stop_timer(workspace_id:int, stop_time = None):
 def start_timer(workspace_id:int, start_time = None):
     current_timer = get_current_time_entry()
     if current_timer:
-        logger.info(f'Timer already running, no need to restart it (?)')
+        logger.info('Timer already running, no need to restart it (?)')
         # stop_timer(workspace_id)
         return None, None
     start_time_str = format_time_epoch(start_time)
@@ -133,8 +134,8 @@ def start_timer(workspace_id:int, start_time = None):
         return None, None
 
 def get_last_time_entry():
-    logger.debug(f'get_last_time_entry')
-    response = api_request(f'me/time_entries')
+    logger.debug('get_last_time_entry')
+    response = api_request('me/time_entries')
     if response is None:
         return None
 

@@ -19,7 +19,8 @@ logger.addHandler(handler)
 
 bucket_name = os.environ['BUCKET_NAME']
 secret_region_name = os.environ['SECRET_REGION_NAME']
-if len(secret_region_name) == 0: secret_region_name = None
+if len(secret_region_name) == 0:
+    secret_region_name = None
 
 color_refresh = 720 # re-download google colors if it is older than 30 days (720 hours)
 google_colors_filename = 'google_colors.json'
@@ -221,12 +222,15 @@ def google_calendar(event, event_action = 'created'):
     else:
         color_id = None
 
-    if duration: project_name = f'{project_name} {duration_formatted}'
-    if len(event_description) > 0: project_name = f'{project_name} ({event_description})'
+    if duration:
+        project_name = f'{project_name} {duration_formatted}'
+    if len(event_description) > 0:
+        project_name = f'{project_name} ({event_description})'
 
     event_description = f'{event_description}\n\nDuration: {duration_formatted}'
     tags = payload.get('tags', None)
-    if tags: event_description += f'\nTags: {", ".join(tags)}'
+    if tags:
+        event_description += f'\nTags: {", ".join(tags)}'
 
     event = {
         'summary': project_name,
@@ -238,11 +242,16 @@ def google_calendar(event, event_action = 'created'):
         }
     }
 
-    if workspace_id : event['extendedProperties']['private']['toggl_workspace_id'] = workspace_id
-    if project_id : event['extendedProperties']['private']['toggl_project_id'] = project_id
-    if toggl_event_id : event['extendedProperties']['private']['toggl_event_id'] = toggl_event_id
-    if toggl_task_id : event['extendedProperties']['private']['toggl_task_id'] = toggl_task_id
-    if color_id : event['colorId'] = color_id
+    if workspace_id :
+        event['extendedProperties']['private']['toggl_workspace_id'] = workspace_id
+    if project_id :
+        event['extendedProperties']['private']['toggl_project_id'] = project_id
+    if toggl_event_id :
+        event['extendedProperties']['private']['toggl_event_id'] = toggl_event_id
+    if toggl_task_id :
+        event['extendedProperties']['private']['toggl_task_id'] = toggl_task_id
+    if color_id :
+        event['colorId'] = color_id
 
     logger.debug(f'Event for Google Calendar: {event}')
     # Call the Calendar API to create an event
