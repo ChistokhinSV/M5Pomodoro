@@ -4,13 +4,12 @@ M5Stack pomodoro timer
 Copyright 2023 Sergei Chistokhin
 
 **/
-#include "secrets.h"  // NOLINT
-
-#define DEBUG 1
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <M5Unified.h>
 #include <MQTTClient.h>
+
+#include "secrets.h"  // NOLINT
 
 // #define DEBUG_NTPClient
 #include <NTPClient.h>
@@ -21,6 +20,7 @@ Copyright 2023 Sergei Chistokhin
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+#include "./main.h"
 #include "./debug.h"
 
 // 50%
@@ -37,8 +37,6 @@ bool subscribed = false;
 
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(8192);  // up to 8kb shadow
-
-#include "./main.h"
 
 // const int tz_shift = 7;  // GMT+7
 const int tz_shift = 0;  // local clock to UTC
@@ -137,6 +135,7 @@ void report_state(String timer_state, u_int32_t start_time,
   }
 
   serializeJson(doc, jsonBuffer);
+  DEBUG_PRINTLN("report_state reported: " + String(jsonBuffer));
   client.publish(get_topic(THINGNAME, true, false), jsonBuffer);
 }
 
@@ -191,10 +190,13 @@ void messageHandler(const String &topic, const String &payload) {
   } else if (timer_state == "REST") {
     if (active_screen->pomodoro.getState() !=
         PomodoroTimer::PomodoroState::REST) {
+      DEBUG_PRINTLN("REST by MQTT");
       active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
                               false, PomodoroTimer::PomodoroLength::SMALL,
                               PomodoroTimer::RestLength::REST_SMALL);
+      DEBUG_PRINTLN("adjustStart REST by MQTT");
       active_screen->pomodoro.adjustStart(start_time);
+      DEBUG_PRINTLN("REST by MQTT complete");
     }
   }
 

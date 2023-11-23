@@ -9,18 +9,18 @@ Copyright 2023 Sergei Chistokhin
 
 #include <LittleFS.h>
 #include <M5Unified.h>
+#include <WiFi.h>
 #include <esp_bt.h>
 #include <esp_bt_main.h>
 #include <esp_wifi.h>
-#include <WiFi.h>
 
 #include <string>
 
 #include "./debug.h"
+#include "./main.h"
+
 #define FASTLED_INTERNAL
 #include <FastLED.h>
-
-#include "./main.h"
 
 #define WAKE_TIMEOUT 30  // seconds
 void goToSleep() {
@@ -39,6 +39,7 @@ screenRender::screenRender()
     : active_state(ScreenState::MainScreen),
       back_buffer(&M5.Lcd),
       description(""),
+      transition(false),
       lastrender(0) {
   sleepTicker.start();
 
@@ -78,22 +79,28 @@ void screenRender::render() {
 void screenRender::setState(ScreenState state, bool rest, bool report_desired,
                             PomodoroTimer::PomodoroLength pomodoro_minutes,
                             PomodoroTimer::RestLength pomodoro_rest_minutes) {
+  DEBUG_PRINTLN("screenRender::setState");
+  transition = true;
   if (active_state != state) {
     switch (state) {
       case ScreenState::MainScreen:
+        DEBUG_PRINTLN("screenRender::setState to MainScreen");
         pomodoro.stopTimer();
         description = "";
         break;
       case ScreenState::PomodoroScreen:
+        DEBUG_PRINTLN("screenRender::setState to PomodoroScreen");
         M5.update();  // clear button state
         pomodoro.setLength(pomodoro_minutes, pomodoro_rest_minutes);
         pomodoro.startTimer(true, rest, report_desired);
         break;
       default:
+        DEBUG_PRINTLN("screenRender::setState to (other_state?)");
         break;
     }
     active_state = state;
   }
+  transition = false;
 }
 
 void screenRender::drawProgressBar(int x, int y, int w, int h, int val,
@@ -113,13 +120,13 @@ void screenRender::drawStatusIcons() {
   int border = 2;
   auto icon_x = screen_width - w - border;
   back_buffer.setTextSize(0);
-  drawProgressBar(icon_x, border, w, h + border, battery,
-                  TFT_RED);
+  drawProgressBar(icon_x, border, w, h + border, battery, TFT_RED);
   back_buffer.setTextColor(TFT_WHITE);
-  back_buffer.drawString(String(battery), icon_x + w/2, h/2 + border, &Font8x8C64);
+  back_buffer.drawString(String(battery), icon_x + w / 2, h / 2 + border,
+                         &Font8x8C64);
 
   back_buffer.setTextDatum(textdatum_t::top_left);
-  back_buffer.drawString(power_drain_str, border, h/2 + border, &Font8x8C64);
+  back_buffer.drawString(power_drain_str, border, h / 2 + border, &Font8x8C64);
   back_buffer.setTextDatum(textdatum_t::middle_center);
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -128,7 +135,8 @@ void screenRender::drawStatusIcons() {
     back_buffer.drawPngFile(LittleFS, ICON_NOWIFI, icon_x - border - h, border);
   }
   if (client.connected()) {
-    back_buffer.drawPngFile(LittleFS, ICON_MQTT, icon_x - (border + h)*2, border);
+    back_buffer.drawPngFile(LittleFS, ICON_MQTT, icon_x - (border + h) * 2,
+                            border);
   }
 }
 
@@ -163,25 +171,27 @@ void screenRender::update() {
   sleepTicker.update();
   pomodoro.update();
 
-  auto pomo = pomodoro.getState();
-  ScreenState newstate;
-  switch (pomo) {
-    case PomodoroTimer::PomodoroState::PAUSED:
-      newstate = ScreenState::PauseScreen;
-      break;
-    case PomodoroTimer::PomodoroState::REST:
-    case PomodoroTimer::PomodoroState::POMODORO:
-      newstate = ScreenState::PomodoroScreen;
-      break;
-    case PomodoroTimer::PomodoroState::STOPPED:
-      newstate = ScreenState::MainScreen;
-      break;
-    default:
-      newstate = ScreenState::MainScreen;
-      break;
-  }
-  if (newstate != active_state) {
-    setState(newstate);
+  if (!transition) {
+    auto pomo = pomodoro.getState();
+    ScreenState newstate;
+    switch (pomo) {
+      case PomodoroTimer::PomodoroState::PAUSED:
+        newstate = ScreenState::PauseScreen;
+        break;
+      case PomodoroTimer::PomodoroState::REST:
+      case PomodoroTimer::PomodoroState::POMODORO:
+        newstate = ScreenState::PomodoroScreen;
+        break;
+      case PomodoroTimer::PomodoroState::STOPPED:
+        newstate = ScreenState::MainScreen;
+        break;
+      default:
+        newstate = ScreenState::MainScreen;
+        break;
+    }
+    if (newstate != active_state) {
+      setState(newstate);
+    }
   }
 }
 

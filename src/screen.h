@@ -63,6 +63,7 @@ class screenRender {
   M5Canvas back_buffer;
   int lastrender;
   String description;
+  bool transition;  // in transition state, no need to check it
 
   int screen_width;
   int screen_height;

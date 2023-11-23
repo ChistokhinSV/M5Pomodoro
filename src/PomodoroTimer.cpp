@@ -14,8 +14,8 @@ Copyright 2023 Sergei Chistokhin
 #include <sstream>
 #include <string>
 
-#include "./debug.h"
 #include "./main.h"
+#include "./debug.h"
 #include "./screen.h"
 // ESP32Time rtc;
 
@@ -39,23 +39,29 @@ PomodoroTimer::PomodoroTimer(
 
 void PomodoroTimer::startTimer(bool reset_timer, bool rest,
                                bool report_desired) {
-  DEBUG_PRINTLN("Pomodoro timer START");
+  DEBUG_PRINTLN("Pomodoro timer START. RESET=" + String(reset_timer) +
+                " REST=" + String(rest) +
+                " REPORT_DESIRED=" + String(report_desired));
   sleepTicker.stop();
-  timerState = PomodoroState::POMODORO;
   pomodoroTimeStart = rtc.getEpoch();
   String state;
   if (reset_timer) {
     if (rest) {
       pomodoroTimeEnd = pomodoroTimeStart + restMinutes * 60;
-      timerState = PomodoroState::REST;
-      state = "REST";
     } else {
       pomodoroTimeEnd = pomodoroTimeStart + pomodoroMinutes * 60;
-      state = "POMODORO";
     }
     pauseTime = 0;
   } else {
     pomodoroTimeEnd = pomodoroTimeStart + pauseTime;
+  }
+
+  if (rest) {
+    timerState = PomodoroState::REST;
+    state = "REST";
+  } else {
+    timerState = PomodoroState::POMODORO;
+    state = "POMODORO";
   }
   pomodoroTicker.start();
   if (report_desired) {
