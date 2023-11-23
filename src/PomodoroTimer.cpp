@@ -14,8 +14,8 @@ Copyright 2023 Sergei Chistokhin
 #include <sstream>
 #include <string>
 
-#include "./main.h"
 #include "./debug.h"
+#include "./main.h"
 #include "./screen.h"
 // ESP32Time rtc;
 
@@ -105,7 +105,7 @@ void PomodoroTimer::stopTimer(bool pause) {
   timerState = pause ? PomodoroState::PAUSED : PomodoroState::STOPPED;
   pomodoroTicker.stop();
   report_state(pause ? "PAUSED" : "STOPPED", pomodoroTimeStart, true, true);
-  ding();
+  ding(2);  // honk honk!
 }
 
 void PomodoroTimer::pauseTimer() { stopTimer(true); }

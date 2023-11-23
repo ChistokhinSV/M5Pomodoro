@@ -16,8 +16,8 @@ Copyright 2023 Sergei Chistokhin
 
 #include <string>
 
-#include "./main.h"
 #include "./debug.h"
+#include "./main.h"
 
 #define FASTLED_INTERNAL
 #include <FastLED.h>
@@ -85,7 +85,9 @@ void screenRender::setState(ScreenState state, bool rest, bool report_desired,
     switch (state) {
       case ScreenState::MainScreen:
         DEBUG_PRINTLN("screenRender::setState to MainScreen");
-        pomodoro.stopTimer();
+        if (pomodoro.isRunning()) {
+          pomodoro.stopTimer();
+        }
         description = "";
         break;
       case ScreenState::PomodoroScreen:

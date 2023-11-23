@@ -181,7 +181,8 @@ void messageHandler(const String &topic, const String &payload) {
 
   DEBUG_PRINTLN("desired timer_state: " + timer_state + " start_time " +
                 start_time);
-  if (reportstate.sent) {  // only act on recieve if there is nothing to send (?)
+  if (reportstate
+          .sent) {  // only act on recieve if there is nothing to send (?)
     if (timer_state == "POMODORO") {  // TODO(ChistokhinSV) add processing for
                                       // pause and other states?
       auto current_time = rtc.getEpoch();

@@ -23,6 +23,4 @@ extern void set_rtc();
 extern void report_state(String timer_state, u_int32_t start_time,
                          bool reported = true, bool both = false);
 
-#define DEBUG 1
-
 #endif  // _MAIN_H_
