@@ -73,6 +73,6 @@ class PomodoroTimer {
 
   void tick();
 
-  void ding() const;
+  void ding(int count = 1) const;
   bool loadWavFile(const char* filename, WavFile* wavFile);
 };

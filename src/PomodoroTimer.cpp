@@ -39,6 +39,7 @@ PomodoroTimer::PomodoroTimer(
 
 void PomodoroTimer::startTimer(bool reset_timer, bool rest,
                                bool report_desired) {
+  DEBUG_PRINTLN("Pomodoro timer START");
   sleepTicker.stop();
   timerState = PomodoroState::POMODORO;
   pomodoroTimeStart = rtc.getEpoch();
@@ -66,6 +67,7 @@ void PomodoroTimer::startTimer(bool reset_timer, bool rest,
 }
 
 void PomodoroTimer::adjustStart(uint32_t startTime) {
+  DEBUG_PRINTLN("Pomodoro timer ADJUST");
   if (pomodoroTimeStart != startTime) {
     pomodoroTimeStart = startTime;
     String state;
@@ -83,6 +85,7 @@ void PomodoroTimer::adjustStart(uint32_t startTime) {
 void PomodoroTimer::startRest() { startTimer(true, true); }
 
 void PomodoroTimer::stopTimer(bool pause) {
+  DEBUG_PRINTLN("Pomodoro timer STOP");
   sleepTicker.start();
   pomodoroTimeStart = 0;
   pomodoroTimeEnd = 0;
@@ -100,8 +103,6 @@ void PomodoroTimer::stopTimer(bool pause) {
 }
 
 void PomodoroTimer::pauseTimer() { stopTimer(true); }
-
-
 
 int PomodoroTimer::getTimerPercentage() const {
   int timeleft = getRemainingTime();
@@ -167,11 +168,13 @@ void PomodoroTimer::tick() {
   }
 }
 
-void PomodoroTimer::ding() const {
-    M5.Power.setVibration(128);
+void PomodoroTimer::ding(int count) const {
+  M5.Power.setVibration(128);
+  for (int i = 0; i < count; i++) {
     M5.Speaker.playWav(sound_ding.data, sound_ding.size);
     delay(500);
-    M5.Power.setVibration(0);
+  }
+  M5.Power.setVibration(0);
 }
 
 bool PomodoroTimer::loadWavFile(const char* filename, WavFile* wavFile) {

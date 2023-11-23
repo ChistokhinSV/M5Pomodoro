@@ -30,7 +30,9 @@ Copyright 2023 Sergei Chistokhin
 
 #define SCREEN_BRIGHTNESS 128
 
-int lastrequest = 0;
+#define NTP_UPDATE 60  // resync every 15 seconds
+uint32_t lastrequest = 0;
+uint32_t lastTimeUpdate = 0;
 bool subscribed = false;
 
 WiFiClientSecure net = WiFiClientSecure();
@@ -61,8 +63,13 @@ Ticker main_ticker(updateControls, 10);
 void render_screen();
 Ticker render_screen_ticker(render_screen, 250);
 
-void connectAWS();
-Ticker connect_AWS_ticker(connectAWS, 250);
+// void connectAWS();
+// Ticker connect_AWS_ticker(connectAWS, 250);
+
+// Global flag to indicate a Wi-Fi reconnect is needed
+volatile bool wifiReconnectNeeded = false;
+// volatile bool mqttReconnectNeeded = false;
+volatile bool net_init = false;
 
 void updateControls() {
   M5.update();
@@ -164,7 +171,7 @@ void messageHandler(const String &topic, const String &payload) {
           // report_state(timer_state, start_time);
         } else if (timer_ongoing < 45 * 60) {  // big pomodoro
           active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                  false, true,
+                                  false, false,
                                   PomodoroTimer::PomodoroLength::BIG,
                                   PomodoroTimer::RestLength::REST);
           active_screen->pomodoro.adjustStart(start_time);
@@ -180,6 +187,14 @@ void messageHandler(const String &topic, const String &payload) {
         PomodoroTimer::PomodoroState::STOPPED) {
       active_screen->setState(screenRender::ScreenState::MainScreen);
       report_state("STOPPED", 0, true, false);
+    }
+  } else if (timer_state == "REST") {
+    if (active_screen->pomodoro.getState() !=
+        PomodoroTimer::PomodoroState::REST) {
+      active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
+                              false, PomodoroTimer::PomodoroLength::SMALL,
+                              PomodoroTimer::RestLength::REST_SMALL);
+      active_screen->pomodoro.adjustStart(start_time);
     }
   }
 
@@ -198,68 +213,68 @@ void set_rtc() {
   M5.Rtc.setDateTime(datetime);
 }
 
-void connectAWS() {
-  // DEBUG_PRINT("Connecting to Wi-Fi");
-  // DEBUG_PRINTLN("connectAWS()");
-  if (!client.connected()) {
-    subscribed = false;
-    lastrequest = 0;
-    if (WiFi.status() != WL_CONNECTED) {
-      DEBUG_PRINTLN("Connecting to Wi-Fi...");
-    } else {
-      DEBUG_PRINTLN("Updating time...");
+// void connectAWS() {
+//   // DEBUG_PRINT("Connecting to Wi-Fi");
+//   // DEBUG_PRINTLN("connectAWS()");
+//   if (!client.connected()) {
+//     subscribed = false;
+//     lastrequest = 0;
+//     if (WiFi.status() != WL_CONNECTED) {
+//       DEBUG_PRINTLN("Connecting to Wi-Fi...");
+//     } else {
+//       DEBUG_PRINTLN("Updating time...");
 
-      timeClient.update();
+//       timeClient.update();
 
-      auto ntp_epoch = timeClient.getEpochTime();
-      rtc.setTime(ntp_epoch);
+//       auto ntp_epoch = timeClient.getEpochTime();
+//       rtc.setTime(ntp_epoch);
 
-      // configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+//       // configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-      struct tm timeinfo;
+//       struct tm timeinfo;
 
-      if (getLocalTime(&timeinfo)) {
-        rtc.setTimeStruct(timeinfo);
-        set_rtc();
-      } else {
-        Serial.println("Failed to obtain time");
-        return;
-      }
+//       if (getLocalTime(&timeinfo)) {
+//         rtc.setTimeStruct(timeinfo);
+//         set_rtc();
+//       } else {
+//         Serial.println("Failed to obtain time");
+//         return;
+//       }
 
-      Serial.println(rtc.getTimeDate(true));
+//       Serial.println(rtc.getTimeDate(true));
 
-      if (!client.connected()) {
-        DEBUG_PRINTLN("Connecting to AWS IOT...");
-        client.connect(THINGNAME);
-      }
-    }
-  } else {
-    if (!subscribed) {
-      DEBUG_PRINTLN("AWS IoT Connected!");
-      client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
-      client.subscribe(get_topic(THINGNAME, true, true));   // updates on UPDATE
-      subscribed = true;
-    }
+//       if (!client.connected()) {
+//         DEBUG_PRINTLN("Connecting to AWS IOT...");
+//         client.connect(THINGNAME);
+//       }
+//     }
+//   } else {
+//     if (!subscribed) {
+//       DEBUG_PRINTLN("AWS IoT Connected!");
+//       client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
+//       client.subscribe(get_topic(THINGNAME, true, true));   // updates on
+//       UPDATE subscribed = true;
+//     }
 
-    if (lastrequest == 0) {
-      set_rtc();
-      char jsonBuffer[512];
-      StaticJsonDocument<200> doc;
-      doc["request"] = "GET SHADOW";
-      serializeJson(doc, jsonBuffer);
+//     if (lastrequest == 0) {
+//       set_rtc();
+//       char jsonBuffer[512];
+//       StaticJsonDocument<200> doc;
+//       doc["request"] = "GET SHADOW";
+//       serializeJson(doc, jsonBuffer);
 
-      Serial.print("Publishing: ");
-      Serial.println(jsonBuffer);
+//       Serial.print("Publishing: ");
+//       Serial.println(jsonBuffer);
 
-      client.publish(get_topic(THINGNAME, false, false),
-                     jsonBuffer);  // ask for current state
-      lastrequest = rtc.getEpoch();
+//       client.publish(get_topic(THINGNAME, false, false),
+//                      jsonBuffer);  // ask for current state
+//       lastrequest = rtc.getEpoch();
 
-      Serial.println(rtc.getTimeDate(true));
-      // m5::rtc_date_t date = M5.Rtc.getDate();
-    }
-  }
-}
+//       Serial.println(rtc.getTimeDate(true));
+//       // m5::rtc_date_t date = M5.Rtc.getDate();
+//     }
+//   }
+// }
 
 void render_screen() { active_screen->render(); }
 
@@ -272,17 +287,118 @@ void initFileSystem() {
   }
 }
 
+void WiFiEvent(WiFiEvent_t event) {
+  switch (event) {
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+      DEBUG_PRINTLN("Wi-Fi disconnected, setting flag for reconnect...");
+      wifiReconnectNeeded = true;
+      break;
+    case SYSTEM_EVENT_STA_LOST_IP:
+      DEBUG_PRINTLN("Wi-Fi lost IP, setting flag for reconnect...");
+      wifiReconnectNeeded = true;
+      break;
+    case SYSTEM_EVENT_WIFI_READY:
+      DEBUG_PRINTLN("Wi-Fi Ready");
+      break;
+    default:
+      break;
+  }
+}
+
+void networkTask(void *pvParameters) {
+  DEBUG_PRINTLN("networkTask()");
+
+  for (;;) {
+    auto ntp_epoch = timeClient.getEpochTime();
+
+    if (wifiReconnectNeeded) {
+      DEBUG_PRINTLN("Wi-Fi init begins");
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      wifiReconnectNeeded = false;
+    }
+    auto wifi_connected = WiFi.isConnected();
+
+    if (wifi_connected && (ntp_epoch - lastTimeUpdate) > NTP_UPDATE) {
+      DEBUG_PRINTLN("Updating time...");
+      timeClient.forceUpdate();
+      lastTimeUpdate = ntp_epoch;
+      rtc.setTime(ntp_epoch);
+    }
+
+    if (!net_init) {
+      // Configure WiFiClientSecure to use the AWS IoT device credentials
+      DEBUG_PRINTLN("net client init");
+      net.setCACert(AWS_CERT_CA);
+      net.setCertificate(AWS_CERT_CRT);
+      net.setPrivateKey(AWS_CERT_PRIVATE);
+
+      client.begin(AWS_IOT_ENDPOINT, 8883, net);
+      client.onMessage(messageHandler);
+
+      net_init = true;
+    }
+
+    if (wifi_connected && !client.connected()) {
+      DEBUG_PRINTLN("Connecting to AWS IOT...");
+      client.connect(THINGNAME);
+      subscribed = false;
+      lastrequest = 0;
+    }
+
+    if (client.connected()) {
+      if (!subscribed) {
+        DEBUG_PRINTLN("AWS IoT Connected!");
+        client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
+        client.subscribe(
+            get_topic(THINGNAME, true, true));  // updates on UPDATE
+        subscribed = true;
+      }
+
+      if (lastrequest == 0) {
+        DEBUG_PRINTLN("Getting the device shadow...");
+        set_rtc();
+        char jsonBuffer[512];
+        StaticJsonDocument<200> doc;
+        doc["request"] = "GET SHADOW";
+        serializeJson(doc, jsonBuffer);
+
+        Serial.print("Publishing: ");
+        Serial.println(jsonBuffer);
+
+        client.publish(get_topic(THINGNAME, false, false),
+                       jsonBuffer);  // ask for current state
+        lastrequest = rtc.getEpoch();
+
+        Serial.println(rtc.getTimeDate(true));
+      }
+    }
+
+    // Other network task activities
+    client.loop();
+
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
 void setup() {
   DEBUG_PRINTLN("Main setup() function");
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
   M5.begin();
   DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
+
+  WiFi.onEvent(WiFiEvent);
+  wifiReconnectNeeded = true;
+  xTaskCreatePinnedToCore(networkTask,   /* Function to implement the task */
+                          "NetworkTask", /* Name of the task */
+                          10000,         /* Stack size in words */
+                          NULL,          /* Task input parameter */
+                          1,             /* Priority of the task */
+                          NULL,          /* Task handle */
+                          1);            /* Core where the task should run */
+
   initFileSystem();
   M5.Lcd.setBrightness(SCREEN_BRIGHTNESS);
-
-  DEBUG_PRINTLN("Wi-Fi init");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   DEBUG_PRINTLN("Speaker init");
   M5.Speaker.setVolume(SPEAKER_VOLUME);
@@ -291,31 +407,19 @@ void setup() {
   DEBUG_PRINTLN("RTC init");
   DEBUG_PRINTLN(rtc.getTimeDate(true));
 
-  // Configure WiFiClientSecure to use the AWS IoT device credentials
-  DEBUG_PRINTLN("net client init");
-  net.setCACert(AWS_CERT_CA);
-  net.setCertificate(AWS_CERT_CRT);
-  net.setPrivateKey(AWS_CERT_PRIVATE);
-
-  DEBUG_PRINTLN("MQTTT client init");
-  client.begin(AWS_IOT_ENDPOINT, 8883, net);
-  client.onMessage(messageHandler);
-
   DEBUG_PRINTLN("Starting timers");
 
   active_screen = new screenRender();
 
   main_ticker.start();
   render_screen_ticker.start();
-  connect_AWS_ticker.start();
+  // connect_AWS_ticker.start();
 }
 
 void loop() {
   main_ticker.update();
   render_screen_ticker.update();
-  connect_AWS_ticker.update();
-
-  client.loop();
+  // connect_AWS_ticker.update();
 
   active_screen->update();
 }
