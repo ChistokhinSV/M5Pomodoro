@@ -10,3 +10,4 @@ src/cert/public.pem.key
 cert/certificate.pem.crt
 cert/private.pem.key
 cert/public.pem.key
+.VSCodeCounter

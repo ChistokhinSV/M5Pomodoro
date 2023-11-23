@@ -20,8 +20,8 @@ Copyright 2023 Sergei Chistokhin
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
-#include "./main.h"
 #include "./debug.h"
+#include "./main.h"
 
 // 50%
 // #define SPEAKER_VOLUME 128
@@ -69,6 +69,67 @@ volatile bool wifiReconnectNeeded = false;
 // volatile bool mqttReconnectNeeded = false;
 volatile bool net_init = false;
 
+struct WavFile {
+  uint8_t *data;
+  size_t size;
+};
+
+WavFile sound_ding;
+
+struct reportState {
+  bool sent = true;
+  bool reported = true;
+  bool both = false;
+  String timer_state;
+  u_int32_t start_time;
+} reportstate;
+
+String get_topic(String thingName, bool update = false, bool accepted = false) {
+  // topic name for unnamed shadow retrieve / update
+  String topic;
+  topic = "$aws/things/" + thingName + "/shadow/";
+  topic = update ? topic + "update" : topic + "get";
+  topic = accepted ? topic + "/accepted" : topic;
+  DEBUG_PRINTLN("topic: " + topic);
+  return topic;
+}
+
+void report_state(String timer_state, u_int32_t start_time,
+                  bool reported /* = true */, bool both /* = false */) {
+  DEBUG_PRINTLN("report_state");
+  reportstate.reported = reported;
+  reportstate.both = both;
+  reportstate.timer_state = timer_state;
+  reportstate.start_time = start_time;
+  reportstate.sent = false;
+}
+
+void send_report_state() {
+  if (!reportstate.sent && client.connected()) {
+    char jsonBuffer[512];
+    StaticJsonDocument<200> doc;
+
+    if (reportstate.reported || reportstate.both) {
+      doc["state"]["reported"]["timer_state"] = reportstate.timer_state;
+      doc["state"]["reported"]["start"] = reportstate.start_time;
+      doc["state"]["reported"]["description"] = active_screen->getTaskName();
+    }
+
+    if (!reportstate.reported || reportstate.both) {
+      doc["state"]["desired"]["timer_state"] = reportstate.timer_state;
+      doc["state"]["desired"]["start"] = reportstate.start_time;
+    }
+
+    serializeJson(doc, jsonBuffer);
+    DEBUG_PRINTLN("send_report_state reported: " + String(jsonBuffer));
+    auto published =
+        client.publish(get_topic(THINGNAME, true, false), jsonBuffer);
+    if (published) {
+      reportstate.sent = true;
+    }
+  }
+}
+
 void updateControls() {
   M5.update();
 
@@ -108,37 +169,6 @@ void updateControls() {
   }
 }
 
-String get_topic(String thingName, bool update = false, bool accepted = false) {
-  // topic name for unnamed shadow retrieve / update
-  String topic;
-  topic = "$aws/things/" + thingName + "/shadow/";
-  topic = update ? topic + "update" : topic + "get";
-  topic = accepted ? topic + "/accepted" : topic;
-  DEBUG_PRINTLN("topic: " + topic);
-  return topic;
-}
-
-void report_state(String timer_state, u_int32_t start_time,
-                  bool reported /* = true */, bool both /* = false */) {
-  char jsonBuffer[512];
-  StaticJsonDocument<200> doc;
-
-  if (reported || both) {
-    doc["state"]["reported"]["timer_state"] = timer_state;
-    doc["state"]["reported"]["start"] = start_time;
-    doc["state"]["reported"]["description"] = active_screen->getTaskName();
-  }
-
-  if (!reported || both) {
-    doc["state"]["desired"]["timer_state"] = timer_state;
-    doc["state"]["desired"]["start"] = start_time;
-  }
-
-  serializeJson(doc, jsonBuffer);
-  DEBUG_PRINTLN("report_state reported: " + String(jsonBuffer));
-  client.publish(get_topic(THINGNAME, true, false), jsonBuffer);
-}
-
 void messageHandler(const String &topic, const String &payload) {
   DEBUG_PRINTLN("incoming: " + topic + " - " + payload);
 
@@ -151,52 +181,54 @@ void messageHandler(const String &topic, const String &payload) {
 
   DEBUG_PRINTLN("desired timer_state: " + timer_state + " start_time " +
                 start_time);
-  if (timer_state == "POMODORO") {  // TODO(ChistokhinSV) add processing for
-                                    // pause and other states?
-    auto current_time = rtc.getEpoch();
-    auto timer_ongoing = current_time - start_time;
+  if (reportstate.sent) {  // only act on recieve if there is nothing to send (?)
+    if (timer_state == "POMODORO") {  // TODO(ChistokhinSV) add processing for
+                                      // pause and other states?
+      auto current_time = rtc.getEpoch();
+      auto timer_ongoing = current_time - start_time;
 
-    auto description = state["description"];
-    if (description) {
-      active_screen->setTaskName(description);
+      auto description = state["description"];
+      if (description) {
+        active_screen->setTaskName(description);
 
-      if (active_screen->pomodoro.getState() !=
-              PomodoroTimer::PomodoroState::POMODORO ||
-          active_screen->pomodoro.getStartTime() != start_time) {
-        if (timer_ongoing < 25 * 60) {  // small pomodoro
-          active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                  false, false);
-          active_screen->pomodoro.adjustStart(start_time);
-          // report_state(timer_state, start_time);
-        } else if (timer_ongoing < 45 * 60) {  // big pomodoro
-          active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                  false, false,
-                                  PomodoroTimer::PomodoroLength::BIG,
-                                  PomodoroTimer::RestLength::REST);
-          active_screen->pomodoro.adjustStart(start_time);
-        } else {  // stop if more than 45 minutes
-          active_screen->setState(screenRender::ScreenState::MainScreen);
-          report_state("STOPPED", 0, true, true);
+        if (active_screen->pomodoro.getState() !=
+                PomodoroTimer::PomodoroState::POMODORO ||
+            active_screen->pomodoro.getStartTime() != start_time) {
+          if (timer_ongoing < 25 * 60) {  // small pomodoro
+            active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                    false, false);
+            active_screen->pomodoro.adjustStart(start_time);
+            // report_state(timer_state, start_time);
+          } else if (timer_ongoing < 45 * 60) {  // big pomodoro
+            active_screen->setState(screenRender::ScreenState::PomodoroScreen,
+                                    false, false,
+                                    PomodoroTimer::PomodoroLength::BIG,
+                                    PomodoroTimer::RestLength::REST);
+            active_screen->pomodoro.adjustStart(start_time);
+          } else {  // stop if more than 45 minutes
+            active_screen->setState(screenRender::ScreenState::MainScreen);
+            report_state("STOPPED", 0, true, true);
+          }
         }
       }
-    }
 
-  } else if (timer_state == "STOPPED") {
-    if (active_screen->pomodoro.getState() !=
-        PomodoroTimer::PomodoroState::STOPPED) {
-      active_screen->setState(screenRender::ScreenState::MainScreen);
-      report_state("STOPPED", 0, true, false);
-    }
-  } else if (timer_state == "REST") {
-    if (active_screen->pomodoro.getState() !=
-        PomodoroTimer::PomodoroState::REST) {
-      DEBUG_PRINTLN("REST by MQTT");
-      active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
-                              false, PomodoroTimer::PomodoroLength::SMALL,
-                              PomodoroTimer::RestLength::REST_SMALL);
-      DEBUG_PRINTLN("adjustStart REST by MQTT");
-      active_screen->pomodoro.adjustStart(start_time);
-      DEBUG_PRINTLN("REST by MQTT complete");
+    } else if (timer_state == "STOPPED") {
+      if (active_screen->pomodoro.getState() !=
+          PomodoroTimer::PomodoroState::STOPPED) {
+        active_screen->setState(screenRender::ScreenState::MainScreen);
+        report_state("STOPPED", 0, true, false);
+      }
+    } else if (timer_state == "REST") {
+      if (active_screen->pomodoro.getState() !=
+          PomodoroTimer::PomodoroState::REST) {
+        DEBUG_PRINTLN("REST by MQTT");
+        active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
+                                false, PomodoroTimer::PomodoroLength::SMALL,
+                                PomodoroTimer::RestLength::REST_SMALL);
+        DEBUG_PRINTLN("adjustStart REST by MQTT");
+        active_screen->pomodoro.adjustStart(start_time);
+        DEBUG_PRINTLN("REST by MQTT complete");
+      }
     }
   }
 
@@ -214,69 +246,6 @@ void set_rtc() {
   datetime.time.seconds = timeinfo.tm_sec;
   M5.Rtc.setDateTime(datetime);
 }
-
-// void connectAWS() {
-//   // DEBUG_PRINT("Connecting to Wi-Fi");
-//   // DEBUG_PRINTLN("connectAWS()");
-//   if (!client.connected()) {
-//     subscribed = false;
-//     lastrequest = 0;
-//     if (WiFi.status() != WL_CONNECTED) {
-//       DEBUG_PRINTLN("Connecting to Wi-Fi...");
-//     } else {
-//       DEBUG_PRINTLN("Updating time...");
-
-//       timeClient.update();
-
-//       auto ntp_epoch = timeClient.getEpochTime();
-//       rtc.setTime(ntp_epoch);
-
-//       // configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-//       struct tm timeinfo;
-
-//       if (getLocalTime(&timeinfo)) {
-//         rtc.setTimeStruct(timeinfo);
-//         set_rtc();
-//       } else {
-//         Serial.println("Failed to obtain time");
-//         return;
-//       }
-
-//       Serial.println(rtc.getTimeDate(true));
-
-//       if (!client.connected()) {
-//         DEBUG_PRINTLN("Connecting to AWS IOT...");
-//         client.connect(THINGNAME);
-//       }
-//     }
-//   } else {
-//     if (!subscribed) {
-//       DEBUG_PRINTLN("AWS IoT Connected!");
-//       client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
-//       client.subscribe(get_topic(THINGNAME, true, true));   // updates on
-//       UPDATE subscribed = true;
-//     }
-
-//     if (lastrequest == 0) {
-//       set_rtc();
-//       char jsonBuffer[512];
-//       StaticJsonDocument<200> doc;
-//       doc["request"] = "GET SHADOW";
-//       serializeJson(doc, jsonBuffer);
-
-//       Serial.print("Publishing: ");
-//       Serial.println(jsonBuffer);
-
-//       client.publish(get_topic(THINGNAME, false, false),
-//                      jsonBuffer);  // ask for current state
-//       lastrequest = rtc.getEpoch();
-
-//       Serial.println(rtc.getTimeDate(true));
-//       // m5::rtc_date_t date = M5.Rtc.getDate();
-//     }
-//   }
-// }
 
 void render_screen() { active_screen->render(); }
 
@@ -374,6 +343,8 @@ void networkTask(void *pvParameters) {
 
         Serial.println(rtc.getTimeDate(true));
       }
+
+      send_report_state();
     }
 
     // Other network task activities

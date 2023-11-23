@@ -16,8 +16,8 @@ Copyright 2023 Sergei Chistokhin
 
 #include <string>
 
-#include "./debug.h"
 #include "./main.h"
+#include "./debug.h"
 
 #define FASTLED_INTERNAL
 #include <FastLED.h>
