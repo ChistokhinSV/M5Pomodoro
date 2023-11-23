@@ -327,7 +327,7 @@ void networkTask(void *pvParameters) {
         subscribed = true;
       }
 
-      if (lastrequest == 0) {
+      if (lastrequest == 0 && reportstate.sent) {
         DEBUG_PRINTLN("Getting the device shadow...");
         set_rtc();
         char jsonBuffer[512];
