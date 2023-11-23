@@ -23,7 +23,11 @@ Copyright 2023 Sergei Chistokhin
 
 #include "./debug.h"
 
-#define SPEAKER_VOLUME 128
+// 50%
+// #define SPEAKER_VOLUME 128
+// 100%
+#define SPEAKER_VOLUME 255
+
 #define SCREEN_BRIGHTNESS 128
 
 int lastrequest = 0;

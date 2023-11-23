@@ -12,7 +12,11 @@ Copyright 2023 Sergei Chistokhin
 
 #include <string>
 
-#define DING_SOUND "/bell.wav"
+// cow bell
+// #define DING_SOUND "/bell.wav"
+
+// goose honk
+#define DING_SOUND "/honk.wav"
 
 class PomodoroTimer {
  public:
