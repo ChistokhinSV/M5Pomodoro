@@ -247,6 +247,7 @@ void set_rtc() {
   datetime.time.minutes = timeinfo.tm_min;
   datetime.time.seconds = timeinfo.tm_sec;
   M5.Rtc.setDateTime(datetime);
+  DEBUG_PRINTLN("set_rtc(): " + rtc.getTimeDate(true));
 }
 
 void render_screen() { active_screen->render(); }
@@ -282,7 +283,7 @@ void networkTask(void *pvParameters) {
   DEBUG_PRINTLN("networkTask()");
 
   for (;;) {
-    auto ntp_epoch = timeClient.getEpochTime();
+    auto ntp_epoch = timeClient.isTimeSet() ? timeClient.getEpochTime() : 0;
 
     if (wifiReconnectNeeded) {
       DEBUG_PRINTLN("Wi-Fi init begins");
@@ -294,17 +295,19 @@ void networkTask(void *pvParameters) {
 
     if (wifi_connected && (ntp_epoch - lastTimeUpdate) > NTP_UPDATE) {
       DEBUG_PRINTLN("Updating time...");
-      timeClient.forceUpdate();
       lastTimeUpdate = ntp_epoch;
+      timeClient.forceUpdate();
 
       auto currentRTC = rtc.getEpoch();
       auto currentNTP = timeClient.getEpochTime();
       auto diff = currentNTP - currentRTC;
-      if (currentRTC > 0 && currentNTP > 0 &&
+      if (timeClient.isTimeSet() && currentRTC > 0 && currentNTP > 0 &&
           diff > 1) {  // if there is more than 1 second difference
         DEBUG_PRINTLN("RTC update, currentRTC=" + String(currentRTC) +
                       ", currentNTP=" + String(currentNTP) +
                       ", diff=" + String(diff));
+        DEBUG_PRINTLN("networkTask rtc.getTimeDate(): " +
+                      rtc.getTimeDate(true));
         rtc.setTime(ntp_epoch);
         active_screen->pomodoro.shift(diff);
         set_rtc();
@@ -332,6 +335,8 @@ void networkTask(void *pvParameters) {
         client.subscribe(
             get_topic(THINGNAME, true, true));  // updates on UPDATE
         subscribed = true;
+        timeClient.begin();
+        timeClient.update();
       }
 
       if (lastrequest == 0 && reportstate.sent) {
@@ -344,6 +349,10 @@ void networkTask(void *pvParameters) {
     // Other network task activities
     if (wifi_connected && client.connected()) {
       client.loop();
+    }
+
+    if (wifi_connected) {
+      timeClient.update();
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -383,6 +392,9 @@ void setup() {
   DEBUG_PRINTLN("Main setup() function");
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
   M5.begin();
+
+  timeClient.end();  // stop NTP client to reduce affecting SSL handshake
+
   DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
 
   WiFi.onEvent(WiFiEvent);
