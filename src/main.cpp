@@ -50,6 +50,7 @@ ESP32Time rtc;
 // ESP32Time rtc(gmtOffset_sec);
 
 #include "./screen.h"
+#include "Arduino.h"
 screenRender *active_screen;
 
 WiFiUDP ntpUDP;
@@ -295,20 +296,26 @@ void networkTask(void *pvParameters) {
       DEBUG_PRINTLN("Updating time...");
       timeClient.forceUpdate();
       lastTimeUpdate = ntp_epoch;
-      rtc.setTime(ntp_epoch);
+
+      auto currentRTC = rtc.getEpoch();
+      auto currentNTP = timeClient.getEpochTime();
+      auto diff = currentNTP - currentRTC;
+      if (currentRTC > 0 && currentNTP > 0 &&
+          diff > 1) {  // if there is more than 1 second difference
+        DEBUG_PRINTLN("RTC update, currentRTC=" + String(currentRTC) +
+                      ", currentNTP=" + String(currentNTP) +
+                      ", diff=" + String(diff));
+        rtc.setTime(ntp_epoch);
+        active_screen->pomodoro.shift(diff);
+        set_rtc();
+
+        DEBUG_PRINTLN("RTC updated, shifted " + String(diff) + " seconds");
+      }
     }
 
     if (!net_init) {
       // Configure WiFiClientSecure to use the AWS IoT device credentials
-      DEBUG_PRINTLN("net client init");
-      net.setCACert(AWS_CERT_CA);
-      net.setCertificate(AWS_CERT_CRT);
-      net.setPrivateKey(AWS_CERT_PRIVATE);
-
-      client.begin(AWS_IOT_ENDPOINT, 8883, net);
-      client.onMessage(messageHandler);
-
-      net_init = true;
+      netClientInit();
     }
 
     if (wifi_connected && !client.connected()) {
@@ -318,7 +325,7 @@ void networkTask(void *pvParameters) {
       lastrequest = 0;
     }
 
-    if (client.connected()) {
+    if (wifi_connected && client.connected()) {
       if (!subscribed) {
         DEBUG_PRINTLN("AWS IoT Connected!");
         client.subscribe(get_topic(THINGNAME, false, true));  // updates on GET
@@ -328,33 +335,50 @@ void networkTask(void *pvParameters) {
       }
 
       if (lastrequest == 0 && reportstate.sent) {
-        DEBUG_PRINTLN("Getting the device shadow...");
-        set_rtc();
-        char jsonBuffer[512];
-        StaticJsonDocument<200> doc;
-        doc["request"] = "GET SHADOW";
-        serializeJson(doc, jsonBuffer);
-
-        Serial.print("Publishing: ");
-        Serial.println(jsonBuffer);
-
-        client.publish(get_topic(THINGNAME, false, false),
-                       jsonBuffer);  // ask for current state
-        lastrequest = rtc.getEpoch();
-
-        Serial.println(rtc.getTimeDate(true));
+        getDeviceShadow();
       }
 
       send_report_state();
     }
 
     // Other network task activities
-    client.loop();
+    if (wifi_connected && client.connected()) {
+      client.loop();
+    }
 
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
+void netClientInit() {
+  DEBUG_PRINTLN("net client init");
+  net.setCACert(AWS_CERT_CA);
+  net.setCertificate(AWS_CERT_CRT);
+  net.setPrivateKey(AWS_CERT_PRIVATE);
+
+  client.begin(AWS_IOT_ENDPOINT, 8883, net);
+  client.onMessage(messageHandler);
+
+  net_init = true;
+}
+
+void getDeviceShadow() {
+  DEBUG_PRINTLN("Getting the device shadow...");
+
+  char jsonBuffer[512];
+  StaticJsonDocument<200> doc;
+  doc["request"] = "GET SHADOW";
+  serializeJson(doc, jsonBuffer);
+
+  Serial.print("Publishing: ");
+  Serial.println(jsonBuffer);
+
+  client.publish(get_topic(THINGNAME, false, false),
+                 jsonBuffer);  // ask for current state
+  lastrequest = rtc.getEpoch();
+
+  Serial.println(rtc.getTimeDate(true));
+}
 void setup() {
   DEBUG_PRINTLN("Main setup() function");
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();

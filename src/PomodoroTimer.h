@@ -46,6 +46,7 @@ class PomodoroTimer {
   void setLength(PomodoroLength pomodoroLength, RestLength restLength);
   void setLength(PomodoroLength pomodoroLength);
   void setRest(RestLength restLength);
+  void shift(int32_t shift);
 
   uint32_t getRemainingTime() const;  // returns time in seconds
   std::string formattedTime() const;

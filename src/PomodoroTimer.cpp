@@ -131,6 +131,11 @@ void PomodoroTimer::setRest(RestLength restLength) {
   restMinutes = toInt(restLength);
 }
 
+void PomodoroTimer::shift(int32_t shift) {
+  pomodoroTimeStart += shift;
+  pomodoroTimeEnd += shift;
+}
+
 uint32_t PomodoroTimer::getRemainingTime() const {
   switch (timerState) {
     case PomodoroState::PAUSED:
