@@ -38,6 +38,7 @@ def api_request(url:str, api_method = "GET", request_body = {}):
             response = requests.put(f'{toggl_api_url}{url}', headers=toggl_api_headers, json=request_body)
         else:
             response = requests.get(f'{toggl_api_url}{url}', headers=toggl_api_headers)
+        logger.info(f'Toggl API request ({api_method}): {response.status_code}, {response.text}')
         return response
     except Exception as e:
         logger.error(f'Error making Toggl API request ({api_method}): {e}')
