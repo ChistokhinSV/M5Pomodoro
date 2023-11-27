@@ -296,10 +296,10 @@ void networkTask(void *pvParameters) {
     if (wifi_connected && (ntp_epoch - lastTimeUpdate) > NTP_UPDATE) {
       DEBUG_PRINTLN("Updating time...");
       lastTimeUpdate = ntp_epoch;
-      timeClient.forceUpdate();
+      auto time_updated = timeClient.forceUpdate();
 
       auto currentRTC = rtc.getEpoch();
-      auto currentNTP = timeClient.getEpochTime();
+      auto currentNTP = time_updated ? timeClient.getEpochTime() : 0;
       auto diff = currentNTP - currentRTC;
       if (timeClient.isTimeSet() && currentRTC > 0 && currentNTP > 0 &&
           diff > 1) {  // if there is more than 1 second difference
