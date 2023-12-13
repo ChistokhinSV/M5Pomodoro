@@ -11,7 +11,7 @@ Copyright 2023 Sergei Chistokhin
 
 #include "secrets.h"  // NOLINT
 
-// #define DEBUG_NTPClient
+#define DEBUG_NTPClient
 #include <NTPClient.h>
 
 // #include "PomodoroTimer.h"
@@ -293,10 +293,14 @@ void networkTask(void *pvParameters) {
     }
     auto wifi_connected = WiFi.isConnected();
 
+    if (wifi_connected) {
+      timeClient.update();
+    }
+
     if (wifi_connected && (ntp_epoch - lastTimeUpdate) > NTP_UPDATE) {
       DEBUG_PRINTLN("Updating time...");
       lastTimeUpdate = ntp_epoch;
-      auto time_updated = timeClient.forceUpdate();
+      auto time_updated = timeClient.isTimeSet();
 
       auto currentRTC = rtc.getEpoch();
       auto currentNTP = time_updated ? timeClient.getEpochTime() : 0;
@@ -364,6 +368,7 @@ void netClientInit() {
   net.setCACert(AWS_CERT_CA);
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
+  net.setTimeout(10);
 
   client.begin(AWS_IOT_ENDPOINT, 8883, net);
   client.onMessage(messageHandler);
@@ -393,7 +398,7 @@ void setup() {
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
   M5.begin();
 
-  timeClient.end();  // stop NTP client to reduce affecting SSL handshake
+  // timeClient.end();  // stop NTP client to reduce affecting SSL handshake
 
   DEBUG_PRINTLN("WAKEUP CAUSE: " + String(wakeup_cause));
 
