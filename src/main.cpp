@@ -369,6 +369,7 @@ void netClientInit() {
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
   net.setTimeout(10);
+  net.setHandshakeTimeout(15);
 
   client.begin(AWS_IOT_ENDPOINT, 8883, net);
   client.onMessage(messageHandler);
