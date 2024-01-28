@@ -23,6 +23,9 @@ Copyright 2023 Sergei Chistokhin
 #include "./debug.h"
 #include "./main.h"
 
+#include "MODULE_HMI.h"
+MODULE_HMI hmi;
+
 // 50%
 // #define SPEAKER_VOLUME 128
 // 100%
@@ -49,6 +52,7 @@ const int daylightOffset_sec = 0;
 ESP32Time rtc;
 // ESP32Time rtc(gmtOffset_sec);
 
+
 #include "./screen.h"
 #include "Arduino.h"
 screenRender *active_screen;
@@ -61,6 +65,10 @@ Ticker main_ticker(updateControls, 10);
 
 void render_screen();
 Ticker render_screen_ticker(render_screen, 250);
+
+void hmi_read();
+int32_t inc_count      = 0;
+Ticker hmi_read_ticker(hmi_read, 100);
 
 // void connectAWS();
 // Ticker connect_AWS_ticker(connectAWS, 250);
@@ -252,6 +260,19 @@ void set_rtc() {
 
 void render_screen() { active_screen->render(); }
 
+void hmi_read() {
+  // DEBUG_PRINTLN("hmi_read()");
+  // DEBUG_PRINTF("Encoder value: %d\n", hmi.getEncoderValue());
+  inc_count = hmi.getIncrementValue();
+  // DEBUG_PRINTF("Encoder inc value: %d\n", inc_count);
+  // DEBUG_PRINTF("btnS:%d, btnA:%d, btnB:%d\n", hmi.getButtonS(),
+  //                 hmi.getButton1(), hmi.getButton2());
+  int step = inc_count / 4;
+  if (step) {
+    DEBUG_PRINTLN("step: " + String(step));
+  }
+}
+
 void initFileSystem() {
   if (!LittleFS.begin(true)) {
     DEBUG_PRINTLN("An Error has occurred while mounting LittleFS");
@@ -423,6 +444,10 @@ void setup() {
   DEBUG_PRINTLN("RTC init");
   DEBUG_PRINTLN(rtc.getTimeDate(true));
 
+  DEBUG_PRINTLN("HMI init");
+  hmi.begin(&Wire1, HMI_ADDR, 21, 22, 100000);
+  DEBUG_PRINTLN(hmi.getFirmwareVersion());
+
   DEBUG_PRINTLN("Starting timers");
 
   active_screen = new screenRender();
@@ -430,11 +455,13 @@ void setup() {
   main_ticker.start();
   render_screen_ticker.start();
   // connect_AWS_ticker.start();
+  hmi_read_ticker.start();
 }
 
 void loop() {
   main_ticker.update();
   render_screen_ticker.update();
+  hmi_read_ticker.update();
   // connect_AWS_ticker.update();
 
   active_screen->update();
