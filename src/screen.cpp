@@ -116,7 +116,12 @@ void screenRender::drawStatusIcons() {
   // at least draw a progress bar to show battery level
   int battery = M5.Power.getBatteryLevel();
   int power_drain = M5.Power.getBatteryCurrent();
+
   String power_drain_str = String(power_drain) + " mA";
+  if (M5.Power.isCharging() == m5::Power_Class::is_charging_t::is_charging) {
+    power_drain_str += " (+)";
+  }
+
   int w = 40;
   int h = 10;
   int border = 2;
