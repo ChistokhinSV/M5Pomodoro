@@ -66,9 +66,9 @@ Ticker main_ticker(updateControls, 10);
 void render_screen();
 Ticker render_screen_ticker(render_screen, 250);
 
-void hmi_read();
+// void hmi_read();
 int32_t inc_count      = 0;
-Ticker hmi_read_ticker(hmi_read, 100);
+// Ticker hmi_read_ticker(hmi_read, 100);
 
 // void connectAWS();
 // Ticker connect_AWS_ticker(connectAWS, 250);
@@ -139,11 +139,43 @@ void send_report_state() {
   }
 }
 
+// void hmi_read() {
+//   // DEBUG_PRINTLN("hmi_read()");
+//   // DEBUG_PRINTF("Encoder value: %d\n", hmi.getEncoderValue());
+//   inc_count = hmi.getIncrementValue();
+//   // DEBUG_PRINTF("Encoder inc value: %d\n", inc_count);
+//   // DEBUG_PRINTF("btnS:%d, btnA:%d, btnB:%d\n", hmi.getButtonS(),
+//   //                 hmi.getButton1(), hmi.getButton2());
+//   int step = inc_count / 4;
+//   if (step) {
+//     DEBUG_PRINTLN("step: " + String(step));
+//   }
+// }
+
 void updateControls() {
   M5.update();
 
+  inc_count = hmi.getIncrementValue();
+
+  auto hmi_A = hmi.getButton1();
+  auto hmi_B = hmi.getButton2();
+
+  int step = inc_count / 4;
+  if (step != 0 && active_screen->getState() == screenRender::ScreenState::MainScreen) {
+    DEBUG_PRINTLN("step: " + String(step));
+
+    int pomodoro_minutes_cfg = active_screen->pomodoro_minutes_cfg + step * 5;
+    if (pomodoro_minutes_cfg >= 60) {
+      pomodoro_minutes_cfg = 60;
+    } else if (pomodoro_minutes_cfg < 5) {
+      pomodoro_minutes_cfg = 5;
+    }
+
+    active_screen->pomodoro_minutes_cfg = pomodoro_minutes_cfg;
+  }
+
   auto count = M5.Touch.getCount();
-  if (count) {
+  if (count != 0 || step != 0) {
     if (sleepTicker.state() == RUNNING) {
       sleepTicker.start();
       DEBUG_PRINTLN("sleepTicker restarted");
@@ -152,18 +184,18 @@ void updateControls() {
 
   switch (active_screen->getState()) {
     case screenRender::ScreenState::MainScreen:
-      if (M5.BtnA.wasPressed()) {
+      if (M5.BtnA.wasPressed() || hmi_A == 0) {
         active_screen->setState(screenRender::ScreenState::PomodoroScreen,
-                                false, true, PomodoroTimer::PomodoroLength::BIG,
+                                false, true, active_screen->pomodoro_minutes_cfg,
                                 PomodoroTimer::RestLength::REST);
       } else if (M5.BtnB.wasPressed()) {
         active_screen->setState(screenRender::ScreenState::PomodoroScreen,
                                 false, true,
-                                PomodoroTimer::PomodoroLength::SMALL,
+                                PomodoroTimer::toInt(PomodoroTimer::PomodoroLength::SMALL),
                                 PomodoroTimer::RestLength::REST_SMALL);
-      } else if (M5.BtnC.wasPressed()) {
+      } else if (M5.BtnC.wasPressed() || hmi_B == 0) {
         active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
-                                true, PomodoroTimer::PomodoroLength::SMALL,
+                                true, PomodoroTimer::toInt(PomodoroTimer::PomodoroLength::SMALL),
                                 PomodoroTimer::RestLength::REST_SMALL);
       }
       break;
@@ -212,7 +244,7 @@ void messageHandler(const String &topic, const String &payload) {
           } else if (timer_ongoing < 45 * 60) {  // big pomodoro
             active_screen->setState(screenRender::ScreenState::PomodoroScreen,
                                     false, false,
-                                    PomodoroTimer::PomodoroLength::BIG,
+                                    PomodoroTimer::toInt(PomodoroTimer::PomodoroLength::BIG),
                                     PomodoroTimer::RestLength::REST);
             active_screen->pomodoro.adjustStart(start_time);
           } else {  // stop if more than 45 minutes
@@ -233,7 +265,7 @@ void messageHandler(const String &topic, const String &payload) {
           PomodoroTimer::PomodoroState::REST) {
         DEBUG_PRINTLN("REST by MQTT");
         active_screen->setState(screenRender::ScreenState::PomodoroScreen, true,
-                                false, PomodoroTimer::PomodoroLength::SMALL,
+                                false, PomodoroTimer::toInt(PomodoroTimer::PomodoroLength::SMALL),
                                 PomodoroTimer::RestLength::REST_SMALL);
         DEBUG_PRINTLN("adjustStart REST by MQTT");
         active_screen->pomodoro.adjustStart(start_time);
@@ -259,19 +291,6 @@ void set_rtc() {
 }
 
 void render_screen() { active_screen->render(); }
-
-void hmi_read() {
-  // DEBUG_PRINTLN("hmi_read()");
-  // DEBUG_PRINTF("Encoder value: %d\n", hmi.getEncoderValue());
-  inc_count = hmi.getIncrementValue();
-  // DEBUG_PRINTF("Encoder inc value: %d\n", inc_count);
-  // DEBUG_PRINTF("btnS:%d, btnA:%d, btnB:%d\n", hmi.getButtonS(),
-  //                 hmi.getButton1(), hmi.getButton2());
-  int step = inc_count / 4;
-  if (step) {
-    DEBUG_PRINTLN("step: " + String(step));
-  }
-}
 
 void initFileSystem() {
   if (!LittleFS.begin(true)) {
@@ -455,13 +474,13 @@ void setup() {
   main_ticker.start();
   render_screen_ticker.start();
   // connect_AWS_ticker.start();
-  hmi_read_ticker.start();
+  // hmi_read_ticker.start();
 }
 
 void loop() {
   main_ticker.update();
   render_screen_ticker.update();
-  hmi_read_ticker.update();
+  // hmi_read_ticker.update();
   // connect_AWS_ticker.update();
 
   active_screen->update();

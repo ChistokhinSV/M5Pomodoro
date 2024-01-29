@@ -44,7 +44,9 @@ class PomodoroTimer {
   uint32_t getStartTime() const { return pomodoroTimeStart; }
 
   void setLength(PomodoroLength pomodoroLength, RestLength restLength);
+  void setLength(int pomodoroLength, RestLength restLength);
   void setLength(PomodoroLength pomodoroLength);
+  void setLength(int pomodoroLength);
   void setRest(RestLength restLength);
   void shift(int32_t shift);
 

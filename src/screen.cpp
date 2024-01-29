@@ -77,7 +77,7 @@ void screenRender::render() {
 }
 
 void screenRender::setState(ScreenState state, bool rest, bool report_desired,
-                            PomodoroTimer::PomodoroLength pomodoro_minutes,
+                            int pomodoro_minutes,
                             PomodoroTimer::RestLength pomodoro_rest_minutes) {
   DEBUG_PRINTLN("screenRender::setState");
   transition = true;
@@ -219,7 +219,7 @@ void screenRender::renderMainScreen() {
 
   back_buffer.setTextSize(0);
   back_buffer.setFont(SMALL_FONT);
-  back_buffer.drawString("45", 55, 225);
+  back_buffer.drawString(String(pomodoro_minutes_cfg), 55, 225);
   back_buffer.drawString("25", 160, 225);
   back_buffer.drawString("Rest", 270, 225);
 

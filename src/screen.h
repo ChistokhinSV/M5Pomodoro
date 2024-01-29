@@ -36,6 +36,7 @@ extern Ticker sleepTicker;
 class screenRender {
  public:
   PomodoroTimer pomodoro;
+  int pomodoro_minutes_cfg = static_cast<int>(PomodoroTimer::PomodoroLength::BIG);
 
   enum class ScreenState {
     Undefined,
@@ -49,8 +50,7 @@ class screenRender {
   void render();
   void setState(ScreenState state, bool rest = false,
                 bool report_desired = true,
-                PomodoroTimer::PomodoroLength pomodoro_minutes =
-                    PomodoroTimer::PomodoroLength::SMALL,
+                int pomodoro_minutes = static_cast<int>(PomodoroTimer::PomodoroLength::SMALL),
                 PomodoroTimer::RestLength pomodoro_rest_minutes =
                     PomodoroTimer::RestLength::REST_SMALL);
   ScreenState getState() const { return active_state; }

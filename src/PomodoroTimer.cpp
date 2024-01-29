@@ -123,8 +123,17 @@ void PomodoroTimer::setLength(PomodoroLength pomodoroLength,
   restMinutes = toInt(restLength);
 }
 
+void PomodoroTimer::setLength(int pomodoroLength, RestLength restLength) {
+  pomodoroMinutes = pomodoroLength;
+  restMinutes = toInt(restLength);
+}
+
 void PomodoroTimer::setLength(PomodoroLength pomodoroLength) {
   pomodoroMinutes = toInt(pomodoroLength);
+}
+
+void PomodoroTimer::setLength(int pomodoroLength) {
+  pomodoroMinutes = pomodoroLength;
 }
 
 void PomodoroTimer::setRest(RestLength restLength) {
